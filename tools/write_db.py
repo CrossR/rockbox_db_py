@@ -107,11 +107,176 @@ def compare_files(input_db_dir, output_db_dir):
 
     if all_files_match:
         print("\nAll compared files match byte-for-byte!")
+        return True
     else:
         print("\nSome files differ from original. Review differences manually.")
         print(
             "  (Consider using a binary diff tool like 'diff' (Linux) or 'Beyond Compare' for detailed analysis.)"
         )
+
+    return False
+
+
+def compare_parsed_dbs(original_db: IndexFile, written_db: IndexFile):
+    """
+    Compares two parsed IndexFile objects field-by-field and entry-by-entry.
+    Provides detailed output for any mismatches.
+    """
+    print("\n--- Comparing Parsed Database Objects (Field-by-Field) ---")
+    all_parsed_match = True
+
+    # 1. Compare header fields
+    header_fields = ["magic", "datasize", "entry_count", "serial", "commitid", "dirty"]
+    print("\n  >> Header Comparison <<")
+    for field in header_fields:
+        orig_val = getattr(original_db, field)
+        written_val = getattr(written_db, field)
+        if orig_val != written_val:
+            print(
+                f"    ❌ Header Field '{field}': Original={orig_val} ({hex(orig_val)}) | Written={written_val} ({hex(written_val)})"
+            )
+            all_parsed_match = False
+        else:
+            print(f"    ✅ Header Field '{field}': {orig_val} ({hex(orig_val)})")
+
+    # 2. Compare entry counts
+    if len(original_db.entries) != len(written_db.entries):
+        print(
+            f"    ❌ Entry Count: Original={len(original_db.entries)} | Written={len(written_db.entries)}"
+        )
+        all_parsed_match = False
+    else:
+        print(f"    ✅ Entry Count: {len(original_db.entries)}")
+
+    # 3. Compare entries themselves (up to a certain limit or all if small)
+    print("\n  >> Entry-by-Entry Comparison <<")
+    compare_limit = min(
+        len(original_db.entries), len(written_db.entries), 20
+    )  # Compare first 20 or fewer
+    mismatch_found_in_entries = False
+
+    for i in range(compare_limit):
+        orig_entry = original_db.entries[i]
+        written_entry = written_db.entries[i]
+
+        entry_match = True
+        # Compare raw tag_seek arrays and flags
+        if orig_entry.tag_seek != written_entry.tag_seek:
+            print(f"    ❌ Entry {i} (tag_seek) differs.")
+            # For brevity, don't print full arrays here, but note the diff.
+            entry_match = False
+        if orig_entry.flag != written_entry.flag:
+            print(
+                f"    ❌ Entry {i} (flag) differs: Original={hex(orig_entry.flag)} | Written={hex(written_entry.flag)}"
+            )
+            entry_match = False
+
+        # Also compare parsed tag values for common tags
+        common_tags_to_check = [
+            "artist",
+            "album",
+            "title",
+            "filename",
+            "year",
+            "length",
+        ]
+        for tag_name in common_tags_to_check:
+            orig_tag_val = getattr(orig_entry, tag_name)
+            written_tag_val = getattr(written_entry, tag_name)
+            if orig_tag_val != written_tag_val:
+                print(
+                    f"      ❌ Entry {i} Tag '{tag_name}': Original='{orig_tag_val}' | Written='{written_tag_val}'"
+                )
+                entry_match = False
+
+        if not entry_match:
+            mismatch_found_in_entries = True
+            all_parsed_match = False
+        else:
+            if i < 5:  # Only print for first few if they match
+                print(f"    ✅ Entry {i} matches parsed data.")
+
+    if not mismatch_found_in_entries:
+        print(f"    All {compare_limit} compared entries match parsed data.")
+    elif compare_limit < len(original_db.entries):
+        print(f"    ... (Comparison limited to first {compare_limit} entries)")
+
+    # 4. Compare loaded tag files themselves (as objects)
+    print("\n  >> Loaded Tag Files Comparison (Metadata) <<")
+    orig_loaded_tags = original_db.loaded_tag_files
+    written_loaded_tags = written_db.loaded_tag_files
+
+    if len(orig_loaded_tags) != len(written_loaded_tags):
+        print(
+            f"    ❌ Number of loaded tag files differs: Original={len(orig_loaded_tags)} | Written={len(written_loaded_tags)}"
+        )
+        all_parsed_match = False
+    else:
+        print(f"    ✅ Number of loaded tag files matches: {len(orig_loaded_tags)}")
+
+        for tag_idx in orig_loaded_tags:
+            orig_tag_file = orig_loaded_tags.get(tag_idx)
+            written_tag_file = written_loaded_tags.get(tag_idx)
+
+            if not orig_tag_file or not written_tag_file:
+                print(
+                    f"      ❌ Tag file {tag_idx} missing from one of the loaded sets."
+                )
+                all_parsed_match = False
+                continue
+
+            tag_filename = orig_tag_file.db_file_type.filename
+
+            # Compare basic properties of TagFile objects
+            tag_file_props = ["magic", "datasize", "entry_count"]
+            tag_file_match = True
+            print(f"      - {tag_filename}:")
+            for prop in tag_file_props:
+                orig_prop_val = getattr(orig_tag_file, prop)
+                written_prop_val = getattr(written_tag_file, prop)
+                if orig_prop_val != written_prop_val:
+                    print(
+                        f"        ❌ Prop '{prop}': Original={orig_prop_val} | Written={written_prop_val}"
+                    )
+                    tag_file_match = False
+                # else:
+                #     print(f"        ✅ Prop '{prop}': {orig_prop_val}")
+
+            # Optionally, compare the entries within the TagFile objects
+            if len(orig_tag_file.entries) != len(written_tag_file.entries):
+                print(
+                    f"        ❌ Entry count differs: Original={len(orig_tag_file.entries)} | Written={len(written_tag_file.entries)}"
+                )
+                tag_file_match = False
+            else:
+                for j in range(
+                    min(len(orig_tag_file.entries), len(written_tag_file.entries), 5)
+                ):  # Compare first 5 TagFileEntries
+                    orig_tf_entry = orig_tag_file.entries[j]
+                    written_tf_entry = written_tag_file.entries[j]
+                    if orig_tf_entry.tag_data != written_tf_entry.tag_data:
+                        print(
+                            f"          ❌ Entry {j} data differs: Original='{orig_tf_entry.tag_data}' | Written='{written_tf_entry.tag_data}'"
+                        )
+                        tag_file_match = False
+                        break
+                    if orig_tf_entry.idx_id != written_tf_entry.idx_id:
+                        print(
+                            f"          ❌ Entry {j} idx_id differs: Original={orig_tf_entry.idx_id} | Written={written_tf_entry.idx_id}"
+                        )
+                        tag_file_match = False
+                        break
+
+            if tag_file_match:
+                print(f"        ✅ All parsed metadata for {tag_filename} matches.")
+            else:
+                print(f"        ❌ Parsed metadata for {tag_filename} differs.")
+                all_parsed_match = False
+
+    if all_parsed_match:
+        print("\nAll parsed database objects (headers and entries) match!")
+    else:
+        print("\nDifferences found in parsed database objects. See details above.")
 
 
 def parse_args():
@@ -143,7 +308,12 @@ def main():
     load_and_write_rockbox_database(args.input_db_dir, args.output_db_dir)
 
     if args.compare:
-        compare_files(args.input_db_dir, args.output_db_dir)
+        success = compare_files(args.input_db_dir, args.output_db_dir)
+        if not success:
+            compare_parsed_dbs(
+                IndexFile.from_file(os.path.join(args.input_db_dir, RockboxDBFileType.INDEX.filename)),
+                IndexFile.from_file(os.path.join(args.output_db_dir, RockboxDBFileType.INDEX.filename)),
+            )
 
     print("\n--- Process finished ---")
 
