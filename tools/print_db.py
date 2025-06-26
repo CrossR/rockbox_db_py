@@ -1,6 +1,10 @@
-# tools/db_loader.py
+# Debugging and verification script for Rockbox database files.
+#
+# This script is useful for verifying that the code can correctly read and process
+# a set of Rockbox database files.
+import argparse
+from collections import defaultdict
 import os
-import sys
 
 from rockbox_db_py.classes.db_file_type import RockboxDBFileType
 from rockbox_db_py.classes.tag_file import TagFile
@@ -8,26 +12,25 @@ from rockbox_db_py.classes.index_file import IndexFile
 from rockbox_db_py.utils.defs import TagTypeEnum
 
 
-def load_and_print_rockbox_database(db_directory: str):
+def load_rockbox_database(db_directory: str) -> IndexFile:
     """Loads all Rockbox database files from the specified directory and prints their contents."""
-
-    print(f"--- Loading Rockbox database from: {db_directory} ---")
 
     # 1. Load the index file.
     #    All the tag files will be loaded along with it when calling from_file().
     index_filepath = os.path.join(db_directory, RockboxDBFileType.INDEX.filename)
     try:
         main_index = IndexFile.from_file(index_filepath)
-        print(f"\nSuccessfully loaded {RockboxDBFileType.INDEX.filename}:")
-        print(main_index)
     except Exception as e:
         print(f"\nError loading {RockboxDBFileType.INDEX.filename}: {e}")
         return
 
-    # 2. Collect and Print Unique Album Artist and Album Data
-    print("\n--- Unique Artist & Album Combinations ---")  # Changed title
+    return main_index
 
-    unique_combinations = set()  # Use a set to store unique (artist, album) tuples
+
+def print_album_artist_album_data(main_index: IndexFile):
+    print("\n--- Unique Artist & Album Combinations ---")
+
+    unique_combinations = set()
 
     for i, index_entry in enumerate(main_index.entries):
         artist = index_entry.albumartist
@@ -58,15 +61,91 @@ def load_and_print_rockbox_database(db_directory: str):
     print("\n--- Database loading and unique artist/album output complete ---")
 
 
+def get_db_stats(main_index: IndexFile):
+    """Prints statistics about the Rockbox database."""
+    print("\n--- Database Statistics ---")
+    print(f"Total Entries: {main_index.entry_count}")
+    print(f"Database Serial: {main_index.serial}")
+    print(f"Commit ID: {main_index.commitid}")
+    print(f"Dirty Flag: {main_index.dirty}")
+
+    # Count all the tags
+    tag_set_list = defaultdict(list)
+    tags = main_index._loaded_tag_files.values()
+
+    for entry in main_index.entries:
+        tag_set = {}
+        for tag_type in TagTypeEnum:
+            result = getattr(entry, tag_type.name)
+            tag_set_list[tag_type].append(result)
+
+    print("\n--- Tag Counts ---")
+    for tag_type, result in tag_set_list.items():
+        print(f"{tag_type.name}: {len(set(result))} unique values")
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Print Rockbox database contents.")
+    parser.add_argument(
+        "db_path",
+        type=str,
+        help="Path to the directory containing Rockbox database files.",
+    )
+
+    # Options for additional functionality
+    parser.add_argument(
+        "--stats", action="store_true", help="Print statistics about the database."
+    )
+    parser.add_argument(
+        "--albums",
+        action="store_true",
+        help="Print unique artist and album combinations.",
+    )
+    parser.add_argument("--artists", action="store_true", help="Print unique artists.")
+    parser.add_argument("--tracks", action="store_true", help="Print unique tracks.")
+
+    args = parser.parse_args()
+
+    # If nothing is specified, default to printing albums
+    if not any([args.stats, args.artists, args.tracks]):
+        args.albums = True
+
+    return args
+
+
+def main():
+
+    args = parse_args()
+    main_index = load_rockbox_database(args.db_path)
+
+    if main_index is None:
+        print("Failed to load the Rockbox database.")
+        return
+
+    if args.albums:
+        print_album_artist_album_data(main_index)
+
+    if args.artists:
+        print("\n--- Unique Artists ---")
+        unique_artists = set()
+        for entry in main_index.entries:
+            if entry.artist:
+                unique_artists.add(entry.artist)
+        for artist in sorted(unique_artists):
+            print(artist)
+
+    if args.tracks:
+        print("\n--- Unique Tracks ---")
+        unique_tracks = set()
+        for entry in main_index.entries:
+            if entry.title:
+                unique_tracks.add(entry.title)
+        for track in sorted(unique_tracks):
+            print(track)
+
+    if args.stats:
+        get_db_stats(main_index)
+
+
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python tools/print_db.py <path_to_rockbox_db_directory>")
-        print("\nExample: python tools/print_db.py /mnt/ipod/.rockbox/database")
-        sys.exit(1) # Uncomment this line if you remove the test arg
-
-    db_path_arg = sys.argv[1]
-    if not os.path.isdir(db_path_arg):
-        print(f"Error: Database directory '{db_path_arg}' does not exist.")
-        sys.exit(1)
-
-    load_and_print_rockbox_database(db_path_arg)
+    main()
