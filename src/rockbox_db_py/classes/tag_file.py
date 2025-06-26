@@ -118,6 +118,7 @@ class TagFile:
         """Adds a TagFileEntry to this TagFile."""
         entry.is_filename_db = self.db_file_type.is_filename_db
         self.entries.append(entry)
+        return entry
 
     def __repr__(self):
         tag_name = TAG_TYPES[self.db_file_type.tag_index]

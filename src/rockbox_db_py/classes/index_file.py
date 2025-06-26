@@ -131,6 +131,7 @@ class IndexFile:
         self.entries.append(entry)
         # Ensure new entries also get the loaded_tag_files reference
         entry._loaded_tag_files = self._loaded_tag_files
+        return entry
 
     # Property to allow external access to loaded tag files without directly exposing _loaded_tag_files
     @property

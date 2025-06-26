@@ -19,7 +19,13 @@ sys.path.insert(
 
 from rockbox_db_py.classes.db_file_type import RockboxDBFileType
 from rockbox_db_py.classes.index_file import IndexFile
-from rockbox_db_py.utils.defs import TagTypeEnum, FLAG_DELETED, FILE_TAG_INDICES
+from rockbox_db_py.classes.index_file_entry import IndexFileEntry
+from rockbox_db_py.utils.defs import (
+    TagTypeEnum,
+    FLAG_DELETED,
+    FILE_TAG_INDICES,
+    TAG_COUNT,
+)
 from rockbox_db_py.classes.tag_file import TagFileEntry
 
 
@@ -244,11 +250,17 @@ def perform_multi_genre_modification(main_index: IndexFile):
                 )
                 print(f"    Ensured TagFileEntry for '{individual_genre_name}' exists.")
 
-                # Create a deep copy of the original IndexFileEntry for the new combination
-                new_entry = copy.deepcopy(original_entry)
+                # Create a copy of the original IndexFileEntry for the new combination.
+                # Using copy.deepcopy here is incredibly slow, so we manually create a new entry.
+                new_entry = IndexFileEntry(
+                    tag_seek=[0] * TAG_COUNT,
+                    flag=original_entry.flag & ~FLAG_DELETED,
+                )
 
-                # Reset DELETED flag for the new entry, as it's an active entry
-                new_entry.flag &= ~FLAG_DELETED
+                # Copy the tag_seek from the original entry
+                for idx in range(TAG_COUNT):
+                    if idx != genre_tag_index:
+                        new_entry.tag_seek[idx] = original_entry.tag_seek[idx]
 
                 # Set the genre tag_seek for the new entry to point to the TagFileEntry *object*.
                 # This offset will be finalized to an integer value in finalize_index_for_write().
