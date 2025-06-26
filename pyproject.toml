@@ -1,7 +1,17 @@
 [project]
-name = "rockbox-db-py"
+name = "rockbox_db_py"
 version = "0.1.0"
-description = "Add your description here"
+description = "Build your Rockbox database in Python"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = []
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
