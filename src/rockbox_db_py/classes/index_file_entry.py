@@ -3,6 +3,7 @@
 import struct
 
 from rockbox_db_py.classes.db_file_type import RockboxDBFileType
+from rockbox_db_py.classes.tag_file_entry import TagFileEntry
 from rockbox_db_py.utils.defs import (
     TagTypeEnum,
     TAG_COUNT,
@@ -47,15 +48,19 @@ class IndexFileEntry:
     def to_bytes(self):
         """
         Converts the IndexFileEntry object to its raw byte representation.
-        Ensures TAG_COUNT tag_seek values are written, followed by the flag.
+        Ensures all tag_seek values are integers before packing.
         """
         packed_data = b""
-        # Write TAG_COUNT tag_seek values (each 4 bytes)
         for seek_val in self.tag_seek:
-            packed_data += struct.pack(ENDIANNESS_CHAR + 'I', seek_val)
+            # Ensure seek_val is an integer (offset) or 0xFFFFFFFF sentinel.
+            # It should NOT be a TagFileEntry object at this point.
+            if not isinstance(seek_val, int):
+                # This indicates a bug if finalize_index_for_write wasn't called.
+                raise ValueError(f"Tag seek value is not an integer: {seek_val}. "
+                                 "Ensure finalize_index_for_write is called before to_bytes.")
+            packed_data += struct.pack(ENDIANNESS_CHAR + "I", seek_val)
 
-        # Write the flag (4 bytes)
-        packed_data += struct.pack(ENDIANNESS_CHAR + 'I', self.flag)
+        packed_data += struct.pack(ENDIANNESS_CHAR + "I", self.flag)
 
         return packed_data
 
@@ -102,6 +107,10 @@ class IndexFileEntry:
             )
 
         seek_value = self.tag_seek[tag_index]
+
+        if isinstance(seek_value, TagFileEntry):
+            # If seek_value is a TagFileEntry, return its tag_data directly.
+            return seek_value.tag_data
 
         if tag_index in FILE_TAG_INDICES:
             # Sentinel for no data (0xFFFFFFFF means no tag data)

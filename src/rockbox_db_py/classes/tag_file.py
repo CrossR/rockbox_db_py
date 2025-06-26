@@ -28,6 +28,9 @@ class TagFile:
         # Dictionary to map offsets to TagFileEntry objects for quick lookup
         self.entries_by_offset = {}
 
+        # Dict of tag_data strings
+        self.entries_by_tag_data = {}
+
     @classmethod
     def from_file(cls, filepath: str):
         """
@@ -91,17 +94,8 @@ class TagFile:
             # We track current position to update offset_in_file for newly added entries
             current_offset = f.tell()  # Start after header (12 bytes)
             for entry in self.entries:
-                # Ensure each entry's filename db status is consistent with the
-                # TagFile's enum type
                 entry.is_filename_db = self.db_file_type.is_filename_db
-
-                # Update offset_in_file for this entry if it was dynamically
-                # added or if we are writing a modified database where offsets
-                # might change.  This makes the in-memory object consistent with
-                # the written file.
                 entry.offset_in_file = current_offset
-
-                # Write the entry's bytes
                 entry_bytes = entry.to_bytes()
                 f.write(entry_bytes)
 
@@ -115,6 +109,10 @@ class TagFile:
     def get_entry_by_offset(self, offset: int) -> TagFileEntry | None:
         """Retrieves a TagFileEntry by its byte offset in the file."""
         return self.entries_by_offset.get(offset)
+
+    def get_entry_by_tag_data(self, tag_data: str) -> TagFileEntry | None:
+        """Retrieves a TagFileEntry by its tag data string."""
+        return self.entries_by_tag_data.get(tag_data.lower())
 
     def add_entry(self, entry: TagFileEntry):
         """Adds a TagFileEntry to this TagFile."""
