@@ -13,37 +13,18 @@ def load_and_print_rockbox_database(db_directory: str):
 
     print(f"--- Loading Rockbox database from: {db_directory} ---")
 
-    # 1. Load all tag data files first
-    loaded_tag_files = {}
-    print("\n--- Loading Tag Data Files ---")
-    for db_type in RockboxDBFileType:
-        if db_type == RockboxDBFileType.INDEX:
-            continue
-
-        filepath = os.path.join(db_directory, db_type.filename)
-        if os.path.exists(filepath):
-            try:
-                tag_file = TagFile.from_file(filepath)
-                print(f"Successfully loaded {db_type.filename}: {tag_file}")
-                loaded_tag_files[db_type.tag_index] = tag_file
-            except Exception as e:
-                print(f"Error loading {db_type.filename}: {e}")
-        else:
-            print(f"Warning: {db_type.filename} not found in {db_directory}")
-
-    # 2. Load the main index file, passing the loaded tag files
+    # 1. Load the index file.
+    #    All the tag files will be loaded along with it when calling from_file().
     index_filepath = os.path.join(db_directory, RockboxDBFileType.INDEX.filename)
     try:
-        main_index = IndexFile.from_file(
-            index_filepath, loaded_tag_files=loaded_tag_files
-        )
+        main_index = IndexFile.from_file(index_filepath)
         print(f"\nSuccessfully loaded {RockboxDBFileType.INDEX.filename}:")
         print(main_index)
     except Exception as e:
         print(f"\nError loading {RockboxDBFileType.INDEX.filename}: {e}")
         return
 
-    # 3. Collect and Print Unique Album Artist and Album Data
+    # 2. Collect and Print Unique Album Artist and Album Data
     print("\n--- Unique Artist & Album Combinations ---")  # Changed title
 
     unique_combinations = set()  # Use a set to store unique (artist, album) tuples

@@ -1,17 +1,24 @@
-# index_file.py
-# src/rockbox_db_py/classes/index_file.py
+# File the represent the overall Rockbox index DB file.
+
 import os
-from rockbox_db_py.utils.defs import TAG_MAGIC, TAG_COUNT # TAG_TYPES is now imported by IndexFileEntry if needed for __repr__
+from rockbox_db_py.utils.defs import (
+    TAG_MAGIC,
+    TAG_COUNT,
+)  # TAG_TYPES is now imported by IndexFileEntry if needed for __repr__
 from rockbox_db_py.utils.struct_helpers import read_uint32, write_uint32
-from .index_file_entry import IndexFileEntry
-from .db_file_type import RockboxDBFileType
-# from rockbox_db_py.classes.tag_file import TagFile # Potentially useful for type hinting in load_rockbox_database
+from rockbox_db_py.classes.index_file_entry import IndexFileEntry
+from rockbox_db_py.classes.db_file_type import RockboxDBFileType
+from rockbox_db_py.classes.tag_file import TagFile
+
+from typing import List, Dict, Optional
+
 
 class IndexFile:
     """
     Represents the master index file (database_idx.tcd).
     Corresponds to struct master_header in tagcache.c.
     """
+
     def __init__(self):
         self.db_file_type = RockboxDBFileType.INDEX
         self.magic = self.db_file_type.magic
@@ -20,11 +27,11 @@ class IndexFile:
         self.serial = 0
         self.commitid = 0
         self.dirty = 0
-        self.entries  = []
+        self.entries = []
         self._loaded_tag_files = {}
 
     @classmethod
-    def from_file(cls, filepath: str, loaded_tag_files=None):
+    def from_file(cls, filepath: str, tag_files_to_load: List[RockboxDBFileType] = []):
         """
         Reads an IndexFile from a specified file path.
         :param filepath: Path to the database_idx.tcd file.
@@ -32,14 +39,41 @@ class IndexFile:
                                  This will be passed to each IndexFileEntry.
         """
         filename = os.path.basename(filepath)
+        db_directory = os.path.dirname(filepath)
+
         if filename != RockboxDBFileType.INDEX.filename:
-            raise ValueError(f"File '{filename}' is not the expected master index file ({RockboxDBFileType.INDEX.filename}).")
+            raise ValueError(
+                f"Expected {RockboxDBFileType.INDEX.filename}, got {filename}"
+            )
 
         index_file = cls()
-        if loaded_tag_files is not None:
-            index_file._loaded_tag_files = loaded_tag_files # Set the reference
 
-        with open(filepath, 'rb') as f:
+        # Work out which tag files to load, assuming it is all of them if not specified.
+        if not tag_files_to_load:
+            all_tag_file_types = [
+                ft
+                for ft in RockboxDBFileType
+                if ft != RockboxDBFileType.INDEX and ft.tag_index is not None
+            ]
+            tag_files_to_load = all_tag_file_types
+
+        # Actually load the required tag files.
+        for db_type in tag_files_to_load:
+            tag_filepath = os.path.join(db_directory, db_type.filename)
+            if not os.path.exists(tag_filepath):
+                raise FileNotFoundError(
+                    f"Tag file {db_type.filename} not found at {tag_filepath}"
+                )
+
+            try:
+                tag_file = TagFile.from_file(tag_filepath)
+                index_file._loaded_tag_files[db_type.tag_index] = tag_file
+            except Exception as e:
+                raise RuntimeError(
+                    f"Failed to load tag file {db_type.filename}: {e}"
+                ) from e
+
+        with open(filepath, "rb") as f:
             # Read master header
             magic_read = read_uint32(f)
             datasize_read = read_uint32(f)
@@ -49,7 +83,9 @@ class IndexFile:
             index_file.dirty = read_uint32(f)
 
             if magic_read != index_file.magic:
-                raise ValueError(f"Invalid magic number in {filepath}. Expected {hex(index_file.magic)}, got {hex(magic_read)}")
+                raise ValueError(
+                    f"Invalid magic number in {filepath}. Expected {hex(index_file.magic)}, got {hex(magic_read)}"
+                )
 
             index_file.magic = magic_read
             index_file.datasize = datasize_read
@@ -57,7 +93,9 @@ class IndexFile:
 
             # Read entries, passing the loaded_tag_files
             for _ in range(index_file.entry_count):
-                entry = IndexFileEntry.from_file(f, loaded_tag_files=index_file._loaded_tag_files)
+                entry = IndexFileEntry.from_file(
+                    f, loaded_tag_files=index_file._loaded_tag_files
+                )
                 index_file.entries.append(entry)
 
         return index_file
@@ -70,7 +108,7 @@ class IndexFile:
         self.entry_count = len(self.entries)
         self.datasize = (6 * 4) + sum(entry.size for entry in self.entries)
 
-        with open(filepath, 'wb') as f:
+        with open(filepath, "wb") as f:
             write_uint32(f, self.magic)
             write_uint32(f, self.datasize)
             write_uint32(f, self.entry_count)
