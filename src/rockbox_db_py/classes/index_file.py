@@ -2,9 +2,10 @@
 import os
 from rockbox_db_py.utils.defs import TAG_MAGIC, TAG_COUNT
 from rockbox_db_py.utils.struct_helpers import read_uint32, write_uint32
-from index_file_entry import (
+from rockbox_db_py.classes.index_file_entry import (
     IndexFileEntry,
-)  # Assuming index_file_entry.py is in the same directory
+)
+from rockbox_db_py.classes.db_file_type import RockboxDBFileType
 
 
 class IndexFile:
@@ -28,6 +29,13 @@ class IndexFile:
         Reads an IndexFile from a specified file path.
         :param filepath: Path to the database_idx.tcd file.
         """
+
+        filename = os.path.basename(filepath)
+        if filename != RockboxDBFileType.INDEX.filename:
+            raise ValueError(
+                f"File '{filename}' is not a valid index file. Expected: {RockboxDBFileType.INDEX.filename}"
+            )
+
         index_file = cls()
 
         with open(filepath, "rb") as f:

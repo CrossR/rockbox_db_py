@@ -1,8 +1,8 @@
 # Rockbox Tag File Entry Class
 
-# tag_file_entry.py
 import struct
 import math
+
 from rockbox_db_py.utils.defs import ENCODING, TAGFILE_ENTRY_CHUNK_LENGTH
 from rockbox_db_py.utils.struct_helpers import (
     ENDIANNESS_CHAR,

@@ -1,5 +1,6 @@
 # index_file_entry.py
 import struct
+
 from rockbox_db_py.utils.defs import (
     TAG_COUNT,
     TAG_TYPES,
