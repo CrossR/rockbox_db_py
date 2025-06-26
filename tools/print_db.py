@@ -62,10 +62,7 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python tools/print_db.py <path_to_rockbox_db_directory>")
         print("\nExample: python tools/print_db.py /mnt/ipod/.rockbox/database")
-        sys.argv.append(
-            "D:\\User Files\\Downloads\\rockbox\\files\\"
-        )  # For testing without command line arg
-        # sys.exit(1) # Uncomment this line if you remove the test arg
+        sys.exit(1) # Uncomment this line if you remove the test arg
 
     db_path_arg = sys.argv[1]
     if not os.path.isdir(db_path_arg):
