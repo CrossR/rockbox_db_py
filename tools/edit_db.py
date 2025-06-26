@@ -20,6 +20,7 @@ sys.path.insert(
 from rockbox_db_py.classes.db_file_type import RockboxDBFileType
 from rockbox_db_py.classes.index_file import IndexFile
 from rockbox_db_py.classes.index_file_entry import IndexFileEntry
+from rockbox_db_py.utils.struct_helpers import calculate_crc32
 from rockbox_db_py.utils.defs import (
     TagTypeEnum,
     FLAG_DELETED,
@@ -206,9 +207,9 @@ def perform_multi_genre_modification(main_index: IndexFile):
         )
         return
 
-    entries_to_process = main_index.entries[:]
+    final_entries_list = []
 
-    for original_entry_idx, original_entry in enumerate(entries_to_process):
+    for original_entry_idx, original_entry in enumerate(main_index.entries):
         if original_entry.flag & FLAG_DELETED:
             continue
 
@@ -240,6 +241,20 @@ def perform_multi_genre_modification(main_index: IndexFile):
             original_entry.flag |= FLAG_DELETED
             original_entries_deleted_count += 1
             print(f"  Marked original entry (Index {original_entry_idx}) as DELETED.")
+
+            # Update to set the deleted entries to have a CRC32 checksum
+            for tag_idx in FILE_TAG_INDICES:
+                original_tag_value_str = getattr(
+                    original_entry, TagTypeEnum(tag_idx).name
+                )
+
+                if original_tag_value_str is not None:
+                    crc_checksum = calculate_crc32(original_tag_value_str)
+                    original_entry.tag_seek[tag_idx] = crc_checksum
+                else:
+                    original_entry.tag_seek[tag_idx] = 0xFFFFFFFF
+
+            final_entries_list.append(original_entry)
 
             # 2. For each individual genre, create a new IndexFileEntry
             for individual_genre_name in individual_genres:
@@ -274,6 +289,12 @@ def perform_multi_genre_modification(main_index: IndexFile):
                 new_entries_added_count += 1
 
                 print(f"    Created new IndexFileEntry for: '{individual_genre_name}'.")
+        else:
+            # If the genre string is not multi-valued, just keep the original entry
+            final_entries_list.append(original_entry)
+
+    # After processing all entries, replace the main_index's entries with the final list
+    main_index.entries = final_entries_list
 
     if modified_entries_count == 0:
         print("No multi-valued genre entries found to modify.")

@@ -79,10 +79,14 @@ class TagFile:
         Recalculates datasize and entry_count before writing.
         """
         self.entry_count = len(self.entries)
-
-        # Datasize is the size of the non-header part of the file
-        # This means the sum of all entry.size (which includes entry header + padded data)
         self.datasize = sum(entry.size for entry in self.entries)
+
+        # Clear and rebuild the lookup dictionaries
+        self.entries_by_tag_data = {}
+        self.entries_by_offset = {}
+
+        if self.db_file_type != RockboxDBFileType.FILENAME:
+            self.entries.sort(key=lambda e: e.tag_data.lower())
 
         with open(filepath, "wb") as f:
             # Write header: magic, datasize, entry_count
@@ -105,6 +109,7 @@ class TagFile:
                 # Also update our internal lookup for consistency if needed
                 # after write
                 self.entries_by_offset[entry.offset_in_file] = entry
+                self.entries_by_tag_data[entry.tag_data.lower()] = entry
 
     def get_entry_by_offset(self, offset: int) -> TagFileEntry | None:
         """Retrieves a TagFileEntry by its byte offset in the file."""

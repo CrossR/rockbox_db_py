@@ -12,6 +12,11 @@ from rockbox_db_py.classes.index_file import IndexFile
 from rockbox_db_py.utils.defs import TagTypeEnum, FLAG_DELETED
 
 
+def valid_entry(entry, prop) -> bool:
+    """Check if the entry is valid (not deleted and has the specified property)."""
+    return not (entry.flag & FLAG_DELETED) and getattr(entry, prop) is not None
+
+
 def load_rockbox_database(db_directory: str) -> IndexFile:
     """Loads all Rockbox database files from the specified directory and prints their contents."""
 
@@ -130,7 +135,7 @@ def main():
         print("\n--- Unique Artists ---")
         unique_artists = set()
         for entry in main_index.entries:
-            if entry.artist:
+            if valid_entry(entry, "artist"):
                 unique_artists.add(entry.artist)
         for artist in sorted(unique_artists):
             print(artist)
@@ -139,7 +144,7 @@ def main():
         print("\n--- Unique Tracks ---")
         unique_tracks = set()
         for entry in main_index.entries:
-            if entry.title:
+            if valid_entry(entry, "title"):
                 unique_tracks.add(entry.title)
         for track in sorted(unique_tracks):
             print(track)
@@ -148,9 +153,8 @@ def main():
         print("\n--- Unique Genres ---")
         unique_genres = set()
         for entry in main_index.entries:
-            if not entry.genre or entry.flag & FLAG_DELETED:
-                continue
-            unique_genres.add(entry.genre)
+            if valid_entry(entry, "genre"):
+                unique_genres.add(entry.genre)
         for genre in sorted(unique_genres):
             print(genre)
 
