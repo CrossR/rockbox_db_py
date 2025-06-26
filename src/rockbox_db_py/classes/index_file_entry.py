@@ -1,7 +1,9 @@
 # index_file_entry.py
 import struct
 
+from rockbox_db_py.classes.db_file_type import RockboxDBFileType
 from rockbox_db_py.utils.defs import (
+    TagTypeEnum,
     TAG_COUNT,
     TAG_TYPES,
     FILE_TAG_INDICES,
@@ -10,7 +12,7 @@ from rockbox_db_py.utils.defs import (
     FLAG_DIRCACHE,
     FLAG_DIRTYNUM,
     FLAG_TRKNUMGEN,
-    FLAG_RESURRECTED
+    FLAG_RESURRECTED,
 )
 from rockbox_db_py.utils.struct_helpers import (
     ENDIANNESS_CHAR,
@@ -26,12 +28,12 @@ class IndexFileEntry:
     """
 
     def __init__(self, tag_seek=None, flag=0):
-        # tag_seek should be a list of TAG_COUNT integers
         self.tag_seek = tag_seek if tag_seek is not None else [0] * TAG_COUNT
         self.flag = flag
+        self._loaded_tag_files = {}  # Set by IndexFile when parsing
 
     @classmethod
-    def from_file(cls, f):
+    def from_file(cls, f, loaded_tag_files=None):
         """Reads an IndexFileEntry from a file object."""
         tag_seeks = []
         for _ in range(TAG_COUNT):
@@ -39,7 +41,10 @@ class IndexFileEntry:
 
         flag = read_uint32(f)
 
-        return cls(tag_seek=tag_seeks, flag=flag)
+        instance = cls(tag_seek=tag_seeks, flag=flag)
+        if loaded_tag_files is not None:
+            instance._loaded_tag_files = loaded_tag_files
+        return instance
 
     def to_bytes(self):
         """Converts the IndexFileEntry object to its raw byte representation."""
@@ -54,9 +59,7 @@ class IndexFileEntry:
     @property
     def size(self):
         """Returns the total size of the entry in bytes."""
-        return (
-            TAG_COUNT * 4 + 4
-        )  # TAG_COUNT integers (4 bytes each) + 1 flag integer (4 bytes)
+        return TAG_COUNT * 4 + 4
 
     def get_flag_names(self):
         """Returns a list of human-readable flag names set for this entry."""
@@ -77,20 +80,67 @@ class IndexFileEntry:
         """Extracts the dircache index from the higher 16 bits of the flag."""
         return (self.flag >> 16) & 0x0000FFFF if (self.flag & FLAG_DIRCACHE) else None
 
-    def get_tag_value(self, tag_index):
+    # Helper method to retrieve the value for a specific tag name
+    def get_parsed_tag_value(self, tag_enum: TagTypeEnum):
         """
-        Retrieves the tag's value. For FILE_TAG_INDICES, this is an offset.
-        For EMBEDDED_TAG_INDICES, this is the direct numeric value.
+        Retrieves the actual parsed value for a given tag name.
+        Handles both file-based string tags (via offset lookup)
+        and embedded numeric tags.
         """
+
+        if not isinstance(tag_enum, TagTypeEnum):
+            raise ValueError(f"Expected TagTypeEnum, got {type(tag_enum).__name__}")
+
+        tag_index = tag_enum.value
+
         if tag_index < 0 or tag_index >= TAG_COUNT:
-            raise IndexError(f"Tag index {tag_index} out of bounds.")
-        return self.tag_seek[tag_index]
+            raise IndexError(
+                f"Tag index {tag_index} out of range. Must be between 0 and {TAG_COUNT - 1}."
+            )
+
+        seek_value = self.tag_seek[tag_index]
+
+        if tag_index in FILE_TAG_INDICES:
+            # This is a file-based string tag (offset)
+            if seek_value == 0xFFFFFFFF:  # Sentinel for no data
+                return None
+
+            tag_file_type = None
+            try:
+                tag_file_type = RockboxDBFileType.from_tag_index(tag_index)
+            except ValueError:
+                pass
+
+            if tag_file_type and tag_file_type.tag_index in self._loaded_tag_files:
+                tag_file_obj = self._loaded_tag_files[tag_file_type.tag_index]
+                tag_file_entry = tag_file_obj.get_entry_by_offset(seek_value)
+                if tag_file_entry:
+                    return tag_file_entry.tag_data
+
+            return None
+
+        else:
+            # This is an embedded numeric tag
+            if seek_value == 0:  # Common for undefined numeric tags
+                return None
+            return seek_value
+
+    # Overload __getattr__ for attribute-like access
+    def __getattr__(self, name):
+        # Allow direct access to standard properties
+        if name in ["tag_seek", "flag", "_loaded_tag_files", "size"]:
+            return object.__getattribute__(self, name)
+
+        # Convert the name to an enum before passing it over.
+        try:
+            tag_enum = TagTypeEnum[name]
+        except KeyError:
+            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+
+        return self.get_parsed_tag_value(tag_enum)
 
     def __repr__(self):
-        tag_seek_str = ", ".join(
-            [f"{TAG_TYPES[i]}={self.tag_seek[i]}" for i in range(TAG_COUNT)]
-        )
+        # We'll make this simpler to avoid clutter, as parsed values will be accessed via __getattr__
         return (
-            f"IndexFileEntry(tag_seek=[{tag_seek_str}], flag={hex(self.flag)}, "
-            f"flags={self.get_flag_names()})"
+            f"IndexFileEntry(flag={hex(self.flag)}, " f"flags={self.get_flag_names()})"
         )
