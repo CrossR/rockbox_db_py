@@ -197,20 +197,21 @@ def perform_multi_genre_modification(main_index: IndexFile):
     new_entries_added_count = 0
     original_entries_deleted_count = 0
 
-    genre_tag_index = TagTypeEnum.genre.value
-    genre_file_type = RockboxDBFileType.GENRE
+    genre_tag_index = TagTypeEnum.genre.value  # Numerical index for genre
+    genre_file_type = RockboxDBFileType.GENRE  # Enum member for genre file
 
-    genre_tag_file = main_index.loaded_tag_files.get(genre_file_type.tag_index)
+    genre_tag_file: TagFile = main_index.loaded_tag_files.get(genre_file_type.tag_index)
     if not genre_tag_file:
         print(
             f"Error: Genre tag file ({genre_file_type.filename}) not loaded. Cannot modify genres."
         )
         return
 
-    final_entries_list = []
+    final_entries_list = []  # We'll build the final list here.
 
     for original_entry_idx, original_entry in enumerate(main_index.entries):
         if original_entry.flag & FLAG_DELETED:
+            final_entries_list.append(original_entry)
             continue
 
         original_genre_str = original_entry.genre
@@ -226,74 +227,78 @@ def perform_multi_genre_modification(main_index: IndexFile):
             )
 
             individual_genres = [
-                g.strip() for g in original_genre_str.split("; ") if g.strip()
+                g.strip() for g in original_genre_str.split(";") if g.strip()
             ]
 
             if not individual_genres:
                 print(
                     "  Warning: Split resulted in no individual genres. Skipping modification for this entry."
                 )
+                final_entries_list.append(original_entry)
                 continue
 
             print(f"  Split into: {individual_genres}")
 
-            # 1. Mark the original entry as DELETED
+            # Capture a pristine copy of original_entry.tag_seek BEFORE it's modified for CRC32s.
+            # This copy holds the original integer offsets/values for all tags.
+            original_tag_seek_values_for_new_entries = original_entry.tag_seek.copy()
+
+            # 1b. Mark the original entry as DELETED (this mutates original_entry)
             original_entry.flag |= FLAG_DELETED
             original_entries_deleted_count += 1
             print(f"  Marked original entry (Index {original_entry_idx}) as DELETED.")
 
-            # Update to set the deleted entries to have a CRC32 checksum
+            # This loop now modifies original_entry.tag_seek in place with CRC32s.
             for tag_idx in FILE_TAG_INDICES:
                 original_tag_value_str = getattr(
                     original_entry, TagTypeEnum(tag_idx).name
                 )
-
                 if original_tag_value_str is not None:
                     crc_checksum = calculate_crc32(original_tag_value_str)
                     original_entry.tag_seek[tag_idx] = crc_checksum
+                    print(
+                        f"    Set '{TagTypeEnum(tag_idx).name}' tag_seek to CRC32: {hex(crc_checksum)}"
+                    )
                 else:
                     original_entry.tag_seek[tag_idx] = 0xFFFFFFFF
+                    print(
+                        f"    Set '{TagTypeEnum(tag_idx).name}' tag_seek to sentinel (no original value)."
+                    )
 
-            final_entries_list.append(original_entry)
+            final_entries_list.append(
+                original_entry
+            )  # Keep the now-deleted-and-CRC'd entry in the list
 
             # 2. For each individual genre, create a new IndexFileEntry
             for individual_genre_name in individual_genres:
-                # Get or create the TagFileEntry for this individual genre string
-                # This ensures genre_tag_file contains all necessary unique genre strings.
                 target_genre_tag_entry = genre_tag_file.add_entry(
                     TagFileEntry(tag_data=individual_genre_name, is_filename_db=False)
                 )
                 print(f"    Ensured TagFileEntry for '{individual_genre_name}' exists.")
 
-                # Create a copy of the original IndexFileEntry for the new combination.
-                # Using copy.deepcopy here is incredibly slow, so we manually create a new entry.
+                # Initialize new_entry's tag_seek from the pristine copy (original_tag_seek_values_for_new_entries).
+                # This ensures the new entry gets the original offsets for non-genre tags.
+                new_tag_seek = original_tag_seek_values_for_new_entries.copy()
+
+                # Now, set the genre tag_seek for the new entry to point to the TagFileEntry *object*.
+                new_tag_seek[genre_tag_index] = target_genre_tag_entry
+
                 new_entry = IndexFileEntry(
-                    tag_seek=[0] * TAG_COUNT,
-                    flag=original_entry.flag & ~FLAG_DELETED,
+                    tag_seek=new_tag_seek,  # Pass the correctly constructed list
+                    flag=original_entry.flag
+                    & ~FLAG_DELETED,  # Copy original flag, clear DELETED
                 )
 
-                # Copy the tag_seek from the original entry
-                for idx in range(TAG_COUNT):
-                    if idx != genre_tag_index:
-                        new_entry.tag_seek[idx] = original_entry.tag_seek[idx]
-
-                # Set the genre tag_seek for the new entry to point to the TagFileEntry *object*.
-                # This offset will be finalized to an integer value in finalize_index_for_write().
-                new_entry.tag_seek[genre_tag_index] = target_genre_tag_entry
-
-                # Assign the _loaded_tag_files reference to the new entry so its __getattr__ works.
                 new_entry._loaded_tag_files = main_index.loaded_tag_files
 
-                # Add the new entry to the main_index's list of entries
-                main_index.add_entry(new_entry)
+                final_entries_list.append(new_entry)
                 new_entries_added_count += 1
 
                 print(f"    Created new IndexFileEntry for: '{individual_genre_name}'.")
+
         else:
-            # If the genre string is not multi-valued, just keep the original entry
             final_entries_list.append(original_entry)
 
-    # After processing all entries, replace the main_index's entries with the final list
     main_index.entries = final_entries_list
 
     if modified_entries_count == 0:
@@ -318,56 +323,52 @@ def finalize_index_for_write(main_index: IndexFile):
     """
     print("\nFinalizing IndexFileEntry tag_seek values for writing...")
 
-    # Get the genre tag index for efficiency
-    genre_tag_index = TagTypeEnum.genre.value
+    # We iterate through all entries, deleted or not, because their offsets need to be valid
+    # if they are written to the database.
 
     for index_entry in main_index.entries:
-        # Check if the entry is deleted; no need to finalize its offsets if it won't be used
-        if index_entry.flag & FLAG_DELETED:
-            continue
+        # We process this entry for finalization regardless of DELETED flag,
+        # as it will be written to the database.
 
-        # Iterate through all file-based tags to update their offsets
+        # Iterate through ALL file-based tags to update their offsets
         for tag_idx in FILE_TAG_INDICES:
-            # Access the raw tag_seek value; it might be an integer or a TagFileEntry object
-            raw_seek_value = index_entry.tag_seek[tag_idx]
+            tag_name_str = TagTypeEnum(tag_idx).name  # Get the string name of the tag
 
-            # If it's already an integer (e.g., loaded from disk), keep it unless it's the genre being modified
-            if isinstance(raw_seek_value, int):
-                # If it's the genre tag and we're in the modification context, it *should* be an object if modified
-                # This branch means it's an unmodified genre, or other unmodified file-based tag.
-                # Just ensure it's not the sentinel if its content is None.
-                if (
-                    raw_seek_value == 0xFFFFFFFF
-                    and getattr(index_entry, TagTypeEnum(tag_idx).name) is not None
-                ):
-                    print(
-                        f"  Warning: Tag {TagTypeEnum(tag_idx).name} has sentinel offset but data exists (Index {main_index.entries.index(index_entry)}). Setting to 0."
-                    )
-                    index_entry.tag_seek[tag_idx] = 0
-                continue
+            # Get the current string value of the tag from the IndexFileEntry
+            current_tag_value_str = getattr(index_entry, tag_name_str)
 
-            # If it's a TagFileEntry object, get its final offset
-            elif isinstance(raw_seek_value, TagFileEntry):
-                target_tag_entry = raw_seek_value  # Already the object
+            target_tag_file_obj: TagFile = main_index.loaded_tag_files.get(tag_idx)
 
-                if target_tag_entry.offset_in_file is not None:
-                    index_entry.tag_seek[tag_idx] = target_tag_entry.offset_in_file
-                else:
-                    # This is a critical error: a TagFileEntry object was assigned,
-                    # but after writing its TagFile, it still doesn't have an offset.
-                    # This means it was never properly written or added to its TagFile.
-                    print(
-                        f"  CRITICAL ERROR: TagFileEntry '{target_tag_entry.tag_data}' (Tag {TagTypeEnum(tag_idx).name}) has no assigned offset_in_file AFTER TagFile write. Setting to sentinel."
-                    )
-                    index_entry.tag_seek[tag_idx] = 0xFFFFFFFF
-            else:
-                # This case should not happen if all tag_seek values are either int or TagFileEntry
+            if target_tag_file_obj is None:
+                # This could happen if the TagFile was not loaded (e.g., if tag_files_to_load was specified
+                # and didn't include this tag file, or if the file was missing on disk).
                 print(
-                    f"  ERROR: Unexpected type for tag_seek[{tag_idx}] (Tag {TagTypeEnum(tag_idx).name}): {type(raw_seek_value)}. Setting to sentinel."
+                    f"  Warning: TagFile for index {tag_idx} ({tag_name_str}) not loaded. Setting tag_seek to sentinel for related entries."
                 )
                 index_entry.tag_seek[tag_idx] = 0xFFFFFFFF
+                continue
 
-    print("IndexFileEntry tag_seek values finalized.")
+            target_tag_entry_in_file = None
+            if current_tag_value_str is not None:
+                # Find the TagFileEntry by its string data from the now-written TagFile
+                target_tag_entry_in_file = target_tag_file_obj.get_entry_by_tag_data(
+                    current_tag_value_str
+                )
+
+            if (
+                target_tag_entry_in_file
+                and target_tag_entry_in_file.offset_in_file is not None
+            ):
+                # Set the tag_seek to the actual numerical offset from the *newly written* TagFile
+                index_entry.tag_seek[tag_idx] = target_tag_entry_in_file.offset_in_file
+            else:
+                # If tag data is None, or entry not found in file (shouldn't happen if data exists), set sentinel
+                # print(f"  Warning: Tag '{tag_name_str}' value '{current_tag_value_str}' could not be found in TagFile '{target_tag_file_obj.db_file_type.filename}' to get offset. Setting to sentinel.")
+                index_entry.tag_seek[tag_idx] = 0xFFFFFFFF
+
+    print(
+        f"IndexFileEntry tag_seek values finalized. Active entries processed: {len(main_index.entries)}"
+    )
 
 
 def save_modified_database(main_index: IndexFile, output_db_dir: str):

@@ -1,9 +1,10 @@
 # src/rockbox_db_py/classes/tag_file.py
 import os
+
 from rockbox_db_py.utils.defs import TAG_TYPES
 from rockbox_db_py.classes.db_file_type import RockboxDBFileType
 from rockbox_db_py.utils.struct_helpers import read_uint32, write_uint32
-from .tag_file_entry import TagFileEntry
+from rockbox_db_py.classes.tag_file_entry import TagFileEntry
 
 
 class TagFile:
@@ -27,8 +28,7 @@ class TagFile:
 
         # Dictionary to map offsets to TagFileEntry objects for quick lookup
         self.entries_by_offset = {}
-
-        # Dict of tag_data strings
+        # Dictionary to map tag data strings to lists of TagFileEntry objects
         self.entries_by_tag_data = {}
 
     @classmethod
@@ -44,13 +44,13 @@ class TagFile:
         if db_file_type.tag_index is None:
             raise ValueError(f"File '{filename}' is not a tag data file.")
 
-        tag_file = cls(db_file_type=db_file_type)
-
         with open(filepath, "rb") as f:
             # Read header
             magic_read = read_uint32(f)
             datasize_read = read_uint32(f)
             entry_count_read = read_uint32(f)
+
+            tag_file = cls(db_file_type=db_file_type)
 
             if magic_read != tag_file.magic:
                 raise ValueError(
@@ -62,11 +62,12 @@ class TagFile:
             tag_file.entry_count = entry_count_read
 
             # Read entries
-            for _ in range(tag_file.entry_count):
+            for i in range(tag_file.entry_count):
                 entry = TagFileEntry.from_file(
                     f, is_filename_db=tag_file.db_file_type.is_filename_db
                 )
                 tag_file.entries.append(entry)
+                tag_file.entries_by_tag_data[entry.tag_data.casefold()] = entry
                 # Store the entry in the dictionary by its offset for quick lookup
                 if entry.offset_in_file is not None:
                     tag_file.entries_by_offset[entry.offset_in_file] = entry
@@ -82,8 +83,8 @@ class TagFile:
         self.datasize = sum(entry.size for entry in self.entries)
 
         # Clear and rebuild the lookup dictionaries
-        self.entries_by_tag_data = {}
         self.entries_by_offset = {}
+        self.entries_by_tag_data = {}
 
         if self.db_file_type != RockboxDBFileType.FILENAME:
             self.entries.sort(key=lambda e: e.tag_data.lower())
@@ -109,7 +110,7 @@ class TagFile:
                 # Also update our internal lookup for consistency if needed
                 # after write
                 self.entries_by_offset[entry.offset_in_file] = entry
-                self.entries_by_tag_data[entry.tag_data.lower()] = entry
+                self.entries_by_tag_data[entry.tag_data.casefold()] = entry
 
     def get_entry_by_offset(self, offset: int) -> TagFileEntry | None:
         """Retrieves a TagFileEntry by its byte offset in the file."""
@@ -117,13 +118,17 @@ class TagFile:
 
     def get_entry_by_tag_data(self, tag_data: str) -> TagFileEntry | None:
         """Retrieves a TagFileEntry by its tag data string."""
-        return self.entries_by_tag_data.get(tag_data.lower())
+        return self.entries_by_tag_data.get(tag_data.casefold())
 
-    def add_entry(self, entry: TagFileEntry):
-        """Adds a TagFileEntry to this TagFile."""
-        entry.is_filename_db = self.db_file_type.is_filename_db
-        self.entries.append(entry)
-        return entry
+    def add_entry(self, entry: TagFileEntry) -> TagFileEntry:
+        entry_tag_data_casefolded = entry.tag_data.casefold()
+        if entry_tag_data_casefolded not in self.entries_by_tag_data:
+            self.entries.append(entry)
+            self.entries_by_tag_data[entry_tag_data_casefolded] = entry
+            return entry
+        else:
+            existing_canonical_entry = self.entries_by_tag_data[entry_tag_data_casefolded]
+            return existing_canonical_entry
 
     def __repr__(self):
         tag_name = TAG_TYPES[self.db_file_type.tag_index]
