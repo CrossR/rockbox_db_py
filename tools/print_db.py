@@ -5,10 +5,7 @@ import sys
 from rockbox_db_py.classes.db_file_type import RockboxDBFileType
 from rockbox_db_py.classes.tag_file import TagFile
 from rockbox_db_py.classes.index_file import IndexFile
-from rockbox_db_py.utils.defs import (
-    TAG_TYPES,
-    FILE_TAG_INDICES,
-)
+from rockbox_db_py.utils.defs import TagTypeEnum
 
 
 def load_and_print_rockbox_database(db_directory: str):
@@ -16,24 +13,13 @@ def load_and_print_rockbox_database(db_directory: str):
 
     print(f"--- Loading Rockbox database from: {db_directory} ---")
 
-    # 1. Load the main index file
-    index_filepath = os.path.join(db_directory, RockboxDBFileType.INDEX.filename)
-    try:
-        main_index = IndexFile.from_file(index_filepath)
-        print(f"\nSuccessfully loaded {RockboxDBFileType.INDEX.filename}:")
-        print(main_index)
-    except Exception as e:
-        print(f"\nError loading {RockboxDBFileType.INDEX.filename}: {e}")
-        return
-
-    # 2. Load all tag data files
+    # 1. Load all tag data files first
     loaded_tag_files = {}
     print("\n--- Loading Tag Data Files ---")
     for db_type in RockboxDBFileType:
         if db_type == RockboxDBFileType.INDEX:
             continue
 
-        # Get the filename and check if it exists
         filepath = os.path.join(db_directory, db_type.filename)
         if os.path.exists(filepath):
             try:
@@ -45,60 +31,60 @@ def load_and_print_rockbox_database(db_directory: str):
         else:
             print(f"Warning: {db_type.filename} not found in {db_directory}")
 
-        # 3. New: Collect and Print Unique Album Artist and Album Data
-    print("\n--- Unique Album Artist & Album Combinations ---")
+    # 2. Load the main index file, passing the loaded tag files
+    index_filepath = os.path.join(db_directory, RockboxDBFileType.INDEX.filename)
+    try:
+        main_index = IndexFile.from_file(
+            index_filepath, loaded_tag_files=loaded_tag_files
+        )
+        print(f"\nSuccessfully loaded {RockboxDBFileType.INDEX.filename}:")
+        print(main_index)
+    except Exception as e:
+        print(f"\nError loading {RockboxDBFileType.INDEX.filename}: {e}")
+        return
 
-    album_artist_tag_idx = RockboxDBFileType.ALBUMARTIST.tag_index
-    album_tag_idx = RockboxDBFileType.ALBUM.tag_index
+    # 3. Collect and Print Unique Album Artist and Album Data
+    print("\n--- Unique Artist & Album Combinations ---")  # Changed title
 
-    unique_albums = set()  # Use a set to store unique (album_artist, album) tuples
+    unique_combinations = set()  # Use a set to store unique (artist, album) tuples
 
     for i, index_entry in enumerate(main_index.entries):
-        album_artist = "(N/A)"
-        album = "(N/A)"
+        artist = index_entry.albumartist
+        year = index_entry.year
+        album = index_entry.album
 
-        # Retrieve Album Artist
-        if album_artist_tag_idx in loaded_tag_files:
-            album_artist_offset = index_entry.get_tag_value(album_artist_tag_idx)
-            album_artist_entry = loaded_tag_files[
-                album_artist_tag_idx
-            ].get_entry_by_offset(album_artist_offset)
-            if album_artist_entry:
-                album_artist = album_artist_entry.tag_data
-
-        # Retrieve Album
-        if album_tag_idx in loaded_tag_files:
-            album_offset = index_entry.get_tag_value(album_tag_idx)
-            album_entry = loaded_tag_files[album_tag_idx].get_entry_by_offset(
-                album_offset
-            )
-            if album_entry:
-                album = album_entry.tag_data
+        # Handle cases where the tag might not exist
+        artist_display = artist if artist is not None else "(N/A)"
+        album_display = album if album is not None else "(N/A)"
+        year_display = year if year is not None else ""
 
         # Add the unique combination to the set
-        unique_albums.add((album_artist, album))
+        unique_combinations.add((artist_display, album_display, year_display))
 
-    if not unique_albums:
-        print("No album artist and album combinations found.")
+    if not unique_combinations:
+        print("No artist and album combinations found.")
         return
 
     # Sort the unique combinations for consistent output
-    sorted_unique_albums = sorted(list(unique_albums))
+    sorted_unique_combinations = sorted(list(unique_combinations))
 
-    print(f"{'Album Artist':<30} | {'Album':<50}")
+    print(f"{'Artist':<30} | {'Album':<50}")
     print("-" * 85)
 
-    for aa, a in sorted_unique_albums:
-        print(f"{aa:<30} | {a:<50}")
+    for a, al, y in sorted_unique_combinations:
+        print(f"{a:<30} | {y} - {al:<50}")
 
-    print("\n--- Database loading and unique album/artist output complete ---")
+    print("\n--- Database loading and unique artist/album output complete ---")
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python tools/db_loader.py <path_to_rockbox_db_directory>")
-        print("\nExample: python tools/db_loader.py /mnt/ipod/.rockbox/database")
-        sys.exit(1)
+        print("Usage: python tools/print_db.py <path_to_rockbox_db_directory>")
+        print("\nExample: python tools/print_db.py /mnt/ipod/.rockbox/database")
+        sys.argv.append(
+            "D:\\User Files\\Downloads\\rockbox\\files\\"
+        )  # For testing without command line arg
+        # sys.exit(1) # Uncomment this line if you remove the test arg
 
     db_path_arg = sys.argv[1]
     if not os.path.isdir(db_path_arg):
