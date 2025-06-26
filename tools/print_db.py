@@ -9,7 +9,7 @@ import os
 from rockbox_db_py.classes.db_file_type import RockboxDBFileType
 from rockbox_db_py.classes.tag_file import TagFile
 from rockbox_db_py.classes.index_file import IndexFile
-from rockbox_db_py.utils.defs import TagTypeEnum
+from rockbox_db_py.utils.defs import TagTypeEnum, FLAG_DELETED
 
 
 def load_rockbox_database(db_directory: str) -> IndexFile:
@@ -103,11 +103,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--artists", action="store_true", help="Print unique artists.")
     parser.add_argument("--tracks", action="store_true", help="Print unique tracks.")
+    parser.add_argument("--genres", action="store_true", help="Print unique genres.")
 
     args = parser.parse_args()
 
     # If nothing is specified, default to printing albums
-    if not any([args.stats, args.artists, args.tracks]):
+    if not any([args.stats, args.artists, args.tracks, args.genres]):
         args.albums = True
 
     return args
@@ -142,6 +143,16 @@ def main():
                 unique_tracks.add(entry.title)
         for track in sorted(unique_tracks):
             print(track)
+
+    if args.genres:
+        print("\n--- Unique Genres ---")
+        unique_genres = set()
+        for entry in main_index.entries:
+            if not entry.genre or entry.flag & FLAG_DELETED:
+                continue
+            unique_genres.add(entry.genre)
+        for genre in sorted(unique_genres):
+            print(genre)
 
     if args.stats:
         get_db_stats(main_index)

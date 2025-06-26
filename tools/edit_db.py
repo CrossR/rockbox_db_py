@@ -225,7 +225,7 @@ def perform_multi_genre_modification(main_index: IndexFile):
             )
 
             individual_genres = [
-                g.strip() for g in original_genre_str.split(";") if g.strip()
+                g.strip() for g in original_genre_str.split("; ") if g.strip()
             ]
 
             if not individual_genres:
