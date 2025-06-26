@@ -1,4 +1,7 @@
 # An individual entry of the Rockbox database index file.
+
+import struct
+
 from rockbox_db_py.classes.db_file_type import RockboxDBFileType
 from rockbox_db_py.utils.defs import (
     TagTypeEnum,
@@ -13,7 +16,6 @@ from rockbox_db_py.utils.defs import (
 from rockbox_db_py.utils.struct_helpers import (
     ENDIANNESS_CHAR,
     read_uint32,
-    write_uint32,
 )
 
 
@@ -50,10 +52,10 @@ class IndexFileEntry:
         packed_data = b""
         # Write TAG_COUNT tag_seek values (each 4 bytes)
         for seek_val in self.tag_seek:
-            packed_data += write_uint32(seek_val)
+            packed_data += struct.pack(ENDIANNESS_CHAR + 'I', seek_val)
 
         # Write the flag (4 bytes)
-        packed_data += write_uint32(self.flag)
+        packed_data += struct.pack(ENDIANNESS_CHAR + 'I', self.flag)
 
         return packed_data
 
