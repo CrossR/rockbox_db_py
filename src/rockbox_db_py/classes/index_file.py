@@ -100,17 +100,22 @@ class IndexFile:
         return index_file
 
     def to_file(self, filepath: str):
-        """
-        Writes the IndexFile object to a specified file path.
-        Recalculates datasize and entry_count before writing.
-
-        """
         self.entry_count = len(self.entries)
-        # Datasize calculation: header size (6 uint32s) + sum of all entry sizes
-        self.datasize = (6 * 4) + sum(entry.size for entry in self.entries)
+
+        # Calculate the total size of the index file.
+        calculated_total_db_size = (6 * 4)
+        calculated_total_db_size += sum(entry.size for entry in self.entries)
+
+        # Add the sizes of all associated TagFiles, EXCLUDING the FILENAME tag file
+        for tag_file_obj in self._loaded_tag_files.values():
+            if tag_file_obj.db_file_type == RockboxDBFileType.FILENAME:
+                continue
+            calculated_total_db_size += tag_file_obj.datasize
+
+        self.datasize = calculated_total_db_size
+
 
         with open(filepath, "wb") as f:
-            # Write master header
             write_uint32(f, self.magic)
             write_uint32(f, self.datasize)
             write_uint32(f, self.entry_count)
@@ -118,7 +123,6 @@ class IndexFile:
             write_uint32(f, self.commitid)
             write_uint32(f, self.dirty)
 
-            # Write entries
             for entry in self.entries:
                 f.write(entry.to_bytes())
 
