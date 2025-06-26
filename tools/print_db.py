@@ -17,13 +17,13 @@ def load_and_print_rockbox_database(db_directory: str):
     print(f"--- Loading Rockbox database from: {db_directory} ---")
 
     # 1. Load the main index file
-    index_filepath = os.path.join(db_directory, RockboxDBFileType.INDEX.name)
+    index_filepath = os.path.join(db_directory, RockboxDBFileType.INDEX.filename)
     try:
         main_index = IndexFile.from_file(index_filepath)
-        print(f"\nSuccessfully loaded {RockboxDBFileType.INDEX.name}:")
-        print(main_index)  # Uses __repr__ of IndexFile
+        print(f"\nSuccessfully loaded {RockboxDBFileType.INDEX.filename}:")
+        print(main_index)
     except Exception as e:
-        print(f"\nError loading {RockboxDBFileType.INDEX.name}: {e}")
+        print(f"\nError loading {RockboxDBFileType.INDEX.filename}: {e}")
         return
 
     # 2. Load all tag data files
@@ -31,71 +31,67 @@ def load_and_print_rockbox_database(db_directory: str):
     print("\n--- Loading Tag Data Files ---")
     for db_type in RockboxDBFileType:
         if db_type == RockboxDBFileType.INDEX:
-            continue  # Skip the index file, already loaded
+            continue
 
-        filepath = os.path.join(db_directory, db_type.name)
+        # Get the filename and check if it exists
+        filepath = os.path.join(db_directory, db_type.filename)
         if os.path.exists(filepath):
             try:
                 tag_file = TagFile.from_file(filepath)
-                print(f"Successfully loaded {db_type.name}: {tag_file}")
+                print(f"Successfully loaded {db_type.filename}: {tag_file}")
                 loaded_tag_files[db_type.tag_index] = tag_file
             except Exception as e:
-                print(f"Error loading {db_type.name}: {e}")
+                print(f"Error loading {db_type.filename}: {e}")
         else:
-            print(f"Warning: {db_type.name} not found in {db_directory}")
+            print(f"Warning: {db_type.filename} not found in {db_directory}")
 
-    # 3. Print Sample Data from Index File Entries and link to TagFile data (where possible)
-    print("\n--- Sample Data from Index File Entries ---")
-    if not main_index.entries:
-        print("No entries found in the main index file.")
+        # 3. New: Collect and Print Unique Album Artist and Album Data
+    print("\n--- Unique Album Artist & Album Combinations ---")
+
+    album_artist_tag_idx = RockboxDBFileType.ALBUMARTIST.tag_index
+    album_tag_idx = RockboxDBFileType.ALBUM.tag_index
+
+    unique_albums = set()  # Use a set to store unique (album_artist, album) tuples
+
+    for i, index_entry in enumerate(main_index.entries):
+        album_artist = "(N/A)"
+        album = "(N/A)"
+
+        # Retrieve Album Artist
+        if album_artist_tag_idx in loaded_tag_files:
+            album_artist_offset = index_entry.get_tag_value(album_artist_tag_idx)
+            album_artist_entry = loaded_tag_files[
+                album_artist_tag_idx
+            ].get_entry_by_offset(album_artist_offset)
+            if album_artist_entry:
+                album_artist = album_artist_entry.tag_data
+
+        # Retrieve Album
+        if album_tag_idx in loaded_tag_files:
+            album_offset = index_entry.get_tag_value(album_tag_idx)
+            album_entry = loaded_tag_files[album_tag_idx].get_entry_by_offset(
+                album_offset
+            )
+            if album_entry:
+                album = album_entry.tag_data
+
+        # Add the unique combination to the set
+        unique_albums.add((album_artist, album))
+
+    if not unique_albums:
+        print("No album artist and album combinations found.")
         return
 
-    for i, index_entry in enumerate(
-        main_index.entries[:20]
-    ):  # Print first 20 entries for brevity
-        print(f"\n--- Index Entry {i} ---")
-        print(f"  Raw Flags: {hex(index_entry.flag)} ({index_entry.get_flag_names()})")
+    # Sort the unique combinations for consistent output
+    sorted_unique_albums = sorted(list(unique_albums))
 
-        for tag_idx, seek_value in enumerate(index_entry.tag_seek):
-            tag_name = TAG_TYPES[tag_idx]
+    print(f"{'Album Artist':<30} | {'Album':<50}")
+    print("-" * 85)
 
-            if tag_idx in FILE_TAG_INDICES:  # This is an offset into a tag file
-                if tag_idx in loaded_tag_files:
-                    tag_file = loaded_tag_files[tag_idx]
-                    # To get the actual string, TagFile needs `get_entry_by_offset`
-                    # For a robust solution, TagFile.from_file should build a map:
-                    # self.entries_by_offset = {entry.offset_in_file: entry for entry in self.entries}
+    for aa, a in sorted_unique_albums:
+        print(f"{aa:<30} | {a:<50}")
 
-                    # For now, let's just indicate the offset and suggest a manual lookup or a simpler iteration
-                    # A basic way to find it without modifying TagFile significantly:
-                    found_tag_entry = None
-                    for tf_entry in tag_file.entries:
-                        # We need TagFileEntry to store the offset it was read from.
-                        # For testing, let's temporarily assume it has `offset_in_file`
-                        if (
-                            hasattr(tf_entry, "offset_in_file")
-                            and tf_entry.offset_in_file == seek_value
-                        ):
-                            found_tag_entry = tf_entry
-                            break
-
-                    if found_tag_entry:
-                        print(
-                            f"  {tag_name} (File Tag): '{found_tag_entry.tag_data}' (Offset: {seek_value})"
-                        )
-                    else:
-                        print(
-                            f"  {tag_name} (File Tag): Offset = {seek_value} (Entry not found at offset in loaded TagFile)"
-                        )
-
-                else:
-                    print(
-                        f"  {tag_name} (File Tag): Offset = {seek_value} (Tag file not loaded or missing)"
-                    )
-            else:  # This is an embedded numeric value
-                print(f"  {tag_name} (Embedded Numeric): Value = {seek_value}")
-
-    print("\n--- Database loading and sample data print complete ---")
+    print("\n--- Database loading and unique album/artist output complete ---")
 
 
 if __name__ == "__main__":
@@ -109,5 +105,4 @@ if __name__ == "__main__":
         print(f"Error: Database directory '{db_path_arg}' does not exist.")
         sys.exit(1)
 
-    # Run the loader
     load_and_print_rockbox_database(db_path_arg)
