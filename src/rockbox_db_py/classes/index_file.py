@@ -1,10 +1,6 @@
-# File the represent the overall Rockbox index DB file.
+# File to represent the overall Rockbox index DB file.
 
 import os
-from rockbox_db_py.utils.defs import (
-    TAG_MAGIC,
-    TAG_COUNT,
-)  # TAG_TYPES is now imported by IndexFileEntry if needed for __repr__
 from rockbox_db_py.utils.struct_helpers import read_uint32, write_uint32
 from rockbox_db_py.classes.index_file_entry import IndexFileEntry
 from rockbox_db_py.classes.db_file_type import RockboxDBFileType
@@ -21,22 +17,23 @@ class IndexFile:
 
     def __init__(self):
         self.db_file_type = RockboxDBFileType.INDEX
-        self.magic = self.db_file_type.magic
-        self.datasize = 0
-        self.entry_count = 0
-        self.serial = 0
-        self.commitid = 0
-        self.dirty = 0
-        self.entries = []
-        self._loaded_tag_files = {}
+        self.magic = self.db_file_type.magic # Magic number from the enum
+        self.datasize = 0 # Will be calculated upon writing
+        self.entry_count = 0 # Will be calculated upon writing
+        self.serial = 0 # Serial from master header
+        self.commitid = 0 # Commit ID from master header
+        self.dirty = 0 # Dirty flag from master header
+        self.entries = [] # List of IndexFileEntry objects
+        self._loaded_tag_files = {} # Holds references to loaded TagFile objects
 
     @classmethod
-    def from_file(cls, filepath: str, tag_files_to_load: List[RockboxDBFileType] = []):
+    def from_file(cls, filepath: str, tag_files_to_load: Optional[List[RockboxDBFileType]] = None):
         """
-        Reads an IndexFile from a specified file path.
+        Reads an IndexFile from a specified file path, and optionally loads associated TagFiles.
         :param filepath: Path to the database_idx.tcd file.
-        :param loaded_tag_files: A dictionary of loaded TagFile objects (tag_index: TagFile).
-                                 This will be passed to each IndexFileEntry.
+        :param tag_files_to_load: An optional list of RockboxDBFileType enum members
+                                  specifying which tag files to load. If None, all known
+                                  tag files will be loaded.
         """
         filename = os.path.basename(filepath)
         db_directory = os.path.dirname(filepath)
@@ -49,7 +46,7 @@ class IndexFile:
         index_file = cls()
 
         # Work out which tag files to load, assuming it is all of them if not specified.
-        if not tag_files_to_load:
+        if tag_files_to_load is None:
             all_tag_file_types = [
                 ft
                 for ft in RockboxDBFileType
@@ -61,6 +58,7 @@ class IndexFile:
         for db_type in tag_files_to_load:
             tag_filepath = os.path.join(db_directory, db_type.filename)
             if not os.path.exists(tag_filepath):
+                # Optionally warn and skip, or raise error. Current code raises.
                 raise FileNotFoundError(
                     f"Tag file {db_type.filename} not found at {tag_filepath}"
                 )
@@ -68,6 +66,7 @@ class IndexFile:
             try:
                 tag_file = TagFile.from_file(tag_filepath)
                 index_file._loaded_tag_files[db_type.tag_index] = tag_file
+                # Log internal loading: Logged by `TagFile.from_file` and `IndexFile.from_file` in print_db.py
             except Exception as e:
                 raise RuntimeError(
                     f"Failed to load tag file {db_type.filename}: {e}"
@@ -104,11 +103,14 @@ class IndexFile:
         """
         Writes the IndexFile object to a specified file path.
         Recalculates datasize and entry_count before writing.
+
         """
         self.entry_count = len(self.entries)
+        # Datasize calculation: header size (6 uint32s) + sum of all entry sizes
         self.datasize = (6 * 4) + sum(entry.size for entry in self.entries)
 
         with open(filepath, "wb") as f:
+            # Write master header
             write_uint32(f, self.magic)
             write_uint32(f, self.datasize)
             write_uint32(f, self.entry_count)
@@ -116,12 +118,21 @@ class IndexFile:
             write_uint32(f, self.commitid)
             write_uint32(f, self.dirty)
 
+            # Write entries
             for entry in self.entries:
                 f.write(entry.to_bytes())
 
     def add_entry(self, entry: IndexFileEntry):
+        """Adds an IndexFileEntry to this IndexFile."""
         self.entries.append(entry)
+        # Ensure new entries also get the loaded_tag_files reference
         entry._loaded_tag_files = self._loaded_tag_files
+
+    # Property to allow external access to loaded tag files without directly exposing _loaded_tag_files
+    @property
+    def loaded_tag_files(self) -> Dict[int, TagFile]:
+        """Returns the dictionary of loaded TagFile objects (tag_index: TagFile)."""
+        return self._loaded_tag_files
 
     def __repr__(self):
         return (

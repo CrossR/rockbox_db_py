@@ -2,7 +2,6 @@
 
 import struct
 import math
-
 from rockbox_db_py.utils.defs import ENCODING, TAGFILE_ENTRY_CHUNK_LENGTH
 from rockbox_db_py.utils.struct_helpers import (
     ENDIANNESS_CHAR,
@@ -17,7 +16,7 @@ class TagFileEntry:
     def __init__(
         self, tag_data="", idx_id=0xFFFFFFFF, is_filename_db=False, offset_in_file=None
     ):
-        self.tag_data = tag_data  # Stored as Python string
+        self.tag_data = tag_data
         self.idx_id = idx_id
         self.is_filename_db = is_filename_db
         self.offset_in_file = offset_in_file
@@ -51,26 +50,35 @@ class TagFileEntry:
         )
 
     def to_bytes(self):
-        """Converts the TagFileEntry object to its raw byte representation, applying padding."""
+        """
+        Converts the TagFileEntry object to its raw byte representation, applying padding.
+        The C code in tagcache.c uses 'X' for padding.
+        """
         encoded_data = self.tag_data.encode(ENCODING)
         data_with_null = encoded_data + b"\x00"
 
         # Calculate the padded length based on filename database status
+        # database_4.tcd (filenames) does not add this padding. All other files
+        # do.
         if self.is_filename_db:
             padded_length = len(data_with_null)
         else:
+            # Padding is to ensure (data_length + sizeof(struct tagfile_entry))
+            # is a multiple of TAGFILE_ENTRY_CHUNK_LENGTH (8) This is equivalent
+            # to ensuring data_with_null_len is a multiple of
+            # TAGFILE_ENTRY_CHUNK_LENGTH (8) for the data part.
             padded_length = (
                 int(math.ceil(len(data_with_null) / TAGFILE_ENTRY_CHUNK_LENGTH))
                 * TAGFILE_ENTRY_CHUNK_LENGTH
             )
 
-        # Pad with 'X' bytes
+        # Pad with 'X' bytes as seen in tagcache.c
         padded_data = data_with_null.ljust(padded_length, b"X")
 
-        # Pack header and padded data
+        # Pack header (tag_length and idx_id) and the padded data
         packed_header = struct.pack(
             ENDIANNESS_CHAR + "II",
-            padded_length,  # This is the tag_length field
+            padded_length,
             self.idx_id,
         )
         return packed_header + padded_data
@@ -91,13 +99,17 @@ class TagFileEntry:
 
     @property
     def size(self):
-        """Returns the total size of the entry in bytes, including header and padding."""
-        return self.tag_length + 8  # 8 bytes for tag_length and idx_id fields
+        """
+        Returns the total size of the entry in bytes, including header (8 bytes for length+id) and padding.
+        As per docs.pdf.
+        """
+        return self.tag_length + 8
 
     def __repr__(self):
         return (
             f"TagFileEntry(tag_data='{self.tag_data}', idx_id={self.idx_id}, "
-            f"is_filename_db={self.is_filename_db}, tag_length={self.tag_length})"
+            f"is_filename_db={self.is_filename_db}, tag_length={self.tag_length}, "
+            f"offset_in_file={self.offset_in_file})"
         )
 
     def __str__(self):
