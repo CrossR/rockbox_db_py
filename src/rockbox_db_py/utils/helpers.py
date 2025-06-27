@@ -1,8 +1,9 @@
 # src/rockbox_db_py/utils/helpers.py
 
+from multiprocessing import Pool
 import os
 import shutil
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Union
 
 # Imports for Rockbox DB classes
 from rockbox_db_py.classes.db_file_type import RockboxDBFileType
@@ -148,39 +149,52 @@ def write_rockbox_database(
         raise
 
 
-def scan_music_directory(directory_path: str) -> List[MusicFile]:
+def _process_file(path: str) -> Optional[MusicFile]:
+    """
+    Helper function to process a single audio file path.
+    """
+    return MusicFile.from_filepath(path)
+
+
+def scan_music_directory(
+    directory_path: str, num_processes: Optional[int] = None
+) -> List[MusicFile]:
     """
     Recursively scans a directory for music files and returns a list of MusicFile objects.
+    Uses multiprocessing to parallelize file parsing.
 
     Args:
         directory_path: The root directory to scan.
+        num_processes: Number of parallel processes to use. If None, uses CPU count.
 
     Returns:
         A list of MusicFile objects found and successfully parsed.
     """
-    music_files: List[MusicFile] = []
-    processed_count: int = 0
-    skipped_count: int = 0
+
+    # Phase 1: Collect all potential audio file paths (filtered by extension)
+    all_potential_audio_paths: List[str] = []
 
     for root, _, files in os.walk(directory_path):
         for file in files:
             file_path: str = os.path.join(root, file)
+            file_extension: str = os.path.splitext(file_path)[1].lower()
 
-            extension = os.path.splitext(file_path)[1].lower()
-            if extension not in SUPPORTED_MUSIC_EXTENSIONS:
-                continue
+            if file_extension in SUPPORTED_MUSIC_EXTENSIONS:
+                all_potential_audio_paths.append(file_path)
 
-            music_file: Optional[MusicFile] = MusicFile.from_filepath(file_path)
+    # Phase 2: Parallel parse audio files
+    if num_processes is None or num_processes <= 0:
+        num_processes = os.cpu_count()
 
-            if music_file:
-                music_files.append(music_file)
-                processed_count += 1
-            else:
-                skipped_count += 1
+    music_files: List[MusicFile] = []
 
-    if skipped_count > 0:
-        print(
-            f"Skipped {skipped_count} files that could not be parsed as MusicFile objects."
-        )
+    with Pool(processes=num_processes) as pool:
+        # Use imap_unordered for better memory management and progress reporting for large lists
+        for result in pool.imap_unordered(_process_file, all_potential_audio_paths):
+            if result:
+                music_files.append(result)
+
+    if not music_files:
+        print("No valid music files found or parsed successfully.")
 
     return music_files
