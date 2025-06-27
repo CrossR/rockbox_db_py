@@ -257,11 +257,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--artists", action="store_true", help="Print unique artists.")
     parser.add_argument("--tracks", action="store_true", help="Print unique tracks.")
     parser.add_argument("--genres", action="store_true", help="Print unique genres.")
+    parser.add_argument(
+        "--debug", action="store_true", help="Run integrity checks on the database."
+    )
 
     args = parser.parse_args()
 
     # If nothing is specified, default to printing albums
-    if not any([args.stats, args.artists, args.tracks, args.genres]):
+    if not any([args.stats, args.artists, args.tracks, args.genres, args.debug]):
         args.albums = True
 
     return args
@@ -283,7 +286,8 @@ def main():
     print(f"Total Entries: {main_index.entry_count}")
 
     # Debugging integrity checks
-    debug_database_integrity(main_index)
+    if args.debug:
+        debug_database_integrity(main_index)
 
     if args.albums:
         print_album_artist_album_data(main_index)
