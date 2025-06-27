@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "Build your Rockbox database in Python"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "pyyaml>=6.0.2",
+]
 
 [build-system]
 requires = ["setuptools>=61.0"]
