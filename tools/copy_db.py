@@ -48,8 +48,8 @@ def load_and_write_rockbox_database(
     # 2. Write the database to the new location using the helper function
     # auto_finalize is True by default in write_rockbox_database
     try:
-        write_rockbox_database(main_index, output_db_dir)
-        print("\nDatabase writing and saving complete.")  # Added for clarity
+        write_rockbox_database(main_index, output_db_dir, auto_finalize=False)
+        print("Database writing and saving complete.")
     except Exception as e:
         print(f"Error writing database: {e}")
         return
