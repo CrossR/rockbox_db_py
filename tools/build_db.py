@@ -55,6 +55,12 @@ def parse_args():
         help="Number of processes to use for parsing music files. Defaults to all available CPU cores.",
     )
     parser.add_argument(
+        "--no-progress",
+        action="store_false",
+        dest="progress",
+        help="Disable progress bar when scanning music files.",
+    )
+    parser.add_argument(
         "--stats",
         action="store_true",
         help="After building the database, print statistics by loading the database and printing stats.",
@@ -72,7 +78,7 @@ def main():
 
     print(f"Processing music files from: {input_music_dir}")
     music_files = scan_music_directory(
-        input_music_dir, num_processes=args.num_processes
+        input_music_dir, num_processes=args.num_processes, show_progress=args.progress
     )
 
     if not music_files:
@@ -84,7 +90,8 @@ def main():
     # Debug print the first 10 music files
     print("First 10 music files:")
     for i, music_file in enumerate(music_files[:10]):
-        print(f"{i + 1}: {music_file.filepath} - {music_file.title or 'No Title'}")
+        print(f"{i + 1}: {music_file.filepath}")
+        print(f"    Track: {music_file.tracknumber or 'No Track Number'}")
         print(f"    Album: {music_file.album or 'No Album'}")
         print(f"    Artist: {music_file.artist or 'No Artist'}")
         print(f"    Track: {music_file.tracknumber or 'No Track Number'}")

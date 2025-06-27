@@ -5,13 +5,14 @@ import os
 import shutil
 from typing import Optional, List, Dict, Union
 
-# Imports for Rockbox DB classes
 from rockbox_db_py.classes.db_file_type import RockboxDBFileType
 from rockbox_db_py.classes.index_file import IndexFile
 from rockbox_db_py.classes.music_file import MusicFile, SUPPORTED_MUSIC_EXTENSIONS
 from rockbox_db_py.classes.tag_file import TagFile
 from rockbox_db_py.classes.tag_file_entry import TagFileEntry
 from rockbox_db_py.utils.defs import TagTypeEnum, FILE_TAG_INDICES
+
+from tqdm import tqdm
 
 
 def load_rockbox_database(db_directory: str) -> Optional[IndexFile]:
@@ -157,7 +158,7 @@ def _process_file(path: str) -> Optional[MusicFile]:
 
 
 def scan_music_directory(
-    directory_path: str, num_processes: Optional[int] = None
+    directory_path: str, num_processes: Optional[int] = None, show_progress: bool = True
 ) -> List[MusicFile]:
     """
     Recursively scans a directory for music files and returns a list of MusicFile objects.
@@ -166,6 +167,7 @@ def scan_music_directory(
     Args:
         directory_path: The root directory to scan.
         num_processes: Number of parallel processes to use. If None, uses CPU count.
+        show_progress: If True, shows progress bar for file processing.
 
     Returns:
         A list of MusicFile objects found and successfully parsed.
@@ -190,7 +192,11 @@ def scan_music_directory(
 
     with Pool(processes=num_processes) as pool:
         # Use imap_unordered for better memory management and progress reporting for large lists
-        for result in pool.imap_unordered(_process_file, all_potential_audio_paths):
+        for result in tqdm(
+            pool.imap_unordered(_process_file, all_potential_audio_paths),
+            total=len(all_potential_audio_paths),
+            disable=not show_progress,
+        ):
             if result:
                 music_files.append(result)
 
