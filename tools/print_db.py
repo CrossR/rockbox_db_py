@@ -4,8 +4,8 @@
 # a set of Rockbox database files.
 import argparse
 from collections import defaultdict
-import os
 
+from rockbox_db_py.classes.music_file import MusicFile
 from rockbox_db_py.classes.db_file_type import RockboxDBFileType
 from rockbox_db_py.classes.tag_file import TagFile
 from rockbox_db_py.classes.index_file import IndexFile

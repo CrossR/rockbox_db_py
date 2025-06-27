@@ -2,12 +2,12 @@
 
 import os
 import shutil
-from typing import Optional, List, Dict  # Used for type hinting
+from typing import Optional, List, Dict
 
 # Imports for Rockbox DB classes
 from rockbox_db_py.classes.db_file_type import RockboxDBFileType
 from rockbox_db_py.classes.index_file import IndexFile
-from rockbox_db_py.classes.index_file_entry import IndexFileEntry
+from rockbox_db_py.classes.music_file import MusicFile
 from rockbox_db_py.classes.tag_file import TagFile
 from rockbox_db_py.classes.tag_file_entry import TagFileEntry
 from rockbox_db_py.utils.defs import TagTypeEnum, FILE_TAG_INDICES
@@ -146,3 +146,34 @@ def write_rockbox_database(
     except Exception as e:
         print(f"Error saving modified database: {e}")
         raise
+
+
+def scan_music_directory(directory_path: str) -> List[MusicFile]:
+    """
+    Recursively scans a directory for music files and returns a list of MusicFile objects.
+
+    Args:
+        directory_path: The root directory to scan.
+
+    Returns:
+        A list of MusicFile objects found and successfully parsed.
+    """
+    music_files: List[MusicFile] = []
+    processed_count: int = 0
+    skipped_count: int = 0
+
+    for root, _, files in os.walk(directory_path):
+        for file in files:
+            file_path: str = os.path.join(root, file)
+            music_file: Optional[MusicFile] = MusicFile.from_filepath(file_path)
+
+            if music_file:
+                music_files.append(music_file)
+                processed_count += 1
+            else:
+                skipped_count += 1
+
+    print(
+        f"--- Scan complete. Processed {processed_count} music files, skipped {skipped_count}. ---"
+    )
+    return music_files
