@@ -1,5 +1,7 @@
 # src/rockbox_db_py/classes/tag_file.py
+
 import os
+from typing import Optional, List, Dict
 
 from rockbox_db_py.utils.defs import TAG_TYPES
 from rockbox_db_py.classes.db_file_type import RockboxDBFileType
@@ -9,48 +11,56 @@ from rockbox_db_py.classes.tag_file_entry import TagFileEntry
 
 class TagFile:
     """
-    Represents an entire tag data file (e.g., database_0.tcd for artist).
-    Corresponds to struct tagcache_header in tagcache.c for its header.
+    Models a Rockbox Tag File (database_X.tcd), which stores collections of tag data entries.
+    This class handles reading from and writing to these files, managing their header
+    and the list of TagFileEntry objects they contain.
     """
 
     def __init__(self, db_file_type: RockboxDBFileType):
-        # Validate that this is a tag data file type
+        # Ensure this TagFile instance is associated with a valid tag data file type.
         if db_file_type.tag_index is None:
             raise ValueError(
                 "RockboxDBFileType must be a tag data file type (e.g., ARTIST, FILENAME) for TagFile."
             )
 
-        self.db_file_type = db_file_type
-        self.magic = self.db_file_type.magic
-        self.datasize = 0
-        self.entry_count = 0
-        self.entries = []
+        self.db_file_type: RockboxDBFileType = db_file_type
+        self.magic: int = self.db_file_type.magic
 
-        # Dictionary to map offsets to TagFileEntry objects for quick lookup
-        self.entries_by_offset = {}
-        # Dictionary to map tag data strings to lists of TagFileEntry objects
-        self.entries_by_tag_data = {}
+        # Total size of entries (excluding header), calculated on write.
+        self.datasize: int = 0
+        # Number of TagFileEntry objects, calculated on write.
+        self.entry_count: int = 0
+        # List of all TagFileEntry objects.
+        self.entries: List[TagFileEntry] = []
+        # Map offsets to TagFileEntry objects for quick lookup by byte offset.
+        self.entries_by_offset: Dict[int, TagFileEntry] = {}
+        # Map case-folded tag data strings to their canonical (unique) TagFileEntry object.
+        self.entries_by_tag_data: Dict[str, TagFileEntry] = {}
 
     @classmethod
-    def from_file(cls, filepath: str):
+    def from_file(cls, filepath: str) -> "TagFile":
         """
-        Reads a TagFile from a specified file path.
-        Determines the file type from the path to correctly initialize.
-        """
-        filename = os.path.basename(filepath)
-        db_file_type = RockboxDBFileType.from_filename(filename)
+        Reads a TagFile from a specified file path, populating its entries and lookups.
 
-        # Validate that it's actually a tag data file, not the index file
+        Args:
+            filepath: Path to the .tcd file.
+
+        Returns:
+            A new TagFile instance.
+        """
+        filename: str = os.path.basename(filepath)
+        db_file_type: RockboxDBFileType = RockboxDBFileType.from_filename(filename)
+
         if db_file_type.tag_index is None:
             raise ValueError(f"File '{filename}' is not a tag data file.")
 
-        with open(filepath, "rb") as f:
-            # Read header
-            magic_read = read_uint32(f)
-            datasize_read = read_uint32(f)
-            entry_count_read = read_uint32(f)
+        tag_file: "TagFile" = cls(db_file_type=db_file_type)
 
-            tag_file = cls(db_file_type=db_file_type)
+        with open(filepath, "rb") as f:
+            # Read TagFile header.
+            magic_read: int = read_uint32(f)
+            datasize_read: int = read_uint32(f)
+            entry_count_read: int = read_uint32(f)
 
             if magic_read != tag_file.magic:
                 raise ValueError(
@@ -61,14 +71,17 @@ class TagFile:
             tag_file.datasize = datasize_read
             tag_file.entry_count = entry_count_read
 
-            # Read entries
-            for i in range(tag_file.entry_count):
-                entry = TagFileEntry.from_file(
+            # Read all TagFileEntry instances.
+            for _ in range(tag_file.entry_count):
+                entry: TagFileEntry = TagFileEntry.from_file(
                     f, is_filename_db=tag_file.db_file_type.is_filename_db
                 )
+
+                # Append entry to the main list (preserving original order and duplicates from file).
                 tag_file.entries.append(entry)
+                # Store entry in lookup by tag data (last one read for a duplicate string becomes canonical).
                 tag_file.entries_by_tag_data[entry.tag_data.casefold()] = entry
-                # Store the entry in the dictionary by its offset for quick lookup
+                # Store entry in lookup by offset (maps original offset to specific entry read at that offset).
                 if entry.offset_in_file is not None:
                     tag_file.entries_by_offset[entry.offset_in_file] = entry
 
@@ -77,67 +90,87 @@ class TagFile:
     def to_file(self, filepath: str):
         """
         Writes the TagFile object to a specified file path.
-        Recalculates datasize and entry_count before writing.
+        Recalculates datasize and entry_count before writing based on current entries.
         """
         self.entry_count = len(self.entries)
         self.datasize = sum(entry.size for entry in self.entries)
 
-        # Clear and rebuild the lookup dictionaries
+        # Clear and rebuild lookup dictionaries to reflect the state of entries being written.
         self.entries_by_offset = {}
         self.entries_by_tag_data = {}
 
+        # Sort entries before writing if the TagFile type expects it (e.g., genre, artist).
+        # However, filename databases are not sorted by tag data.
         if self.db_file_type != RockboxDBFileType.FILENAME:
             self.entries.sort(key=lambda e: e.tag_data.lower())
 
         with open(filepath, "wb") as f:
-            # Write header: magic, datasize, entry_count
+            # Write TagFile header.
             write_uint32(f, self.magic)
             write_uint32(f, self.datasize)
             write_uint32(f, self.entry_count)
 
-            # Write entries
-            # We track current position to update offset_in_file for newly added entries
-            current_offset = f.tell()  # Start after header (12 bytes)
+            # Write each TagFileEntry.
+            current_offset: int = f.tell()
             for entry in self.entries:
                 entry.is_filename_db = self.db_file_type.is_filename_db
+
+                # Update entry's offset to its new position in this file.
                 entry.offset_in_file = current_offset
-                entry_bytes = entry.to_bytes()
+
+                entry_bytes: bytes = entry.to_bytes()
                 f.write(entry_bytes)
 
-                # Update current_offset for the next entry
                 current_offset += len(entry_bytes)
 
-                # Also update our internal lookup for consistency if needed
-                # after write
+                # Update internal lookups with the newly assigned offset and data.
                 self.entries_by_offset[entry.offset_in_file] = entry
                 self.entries_by_tag_data[entry.tag_data.casefold()] = entry
 
-    def get_entry_by_offset(self, offset: int) -> TagFileEntry | None:
+    def get_entry_by_offset(self, offset: int) -> Optional[TagFileEntry]:
         """Retrieves a TagFileEntry by its byte offset in the file."""
         return self.entries_by_offset.get(offset)
 
-    def get_entry_by_tag_data(self, tag_data: str) -> TagFileEntry | None:
-        """Retrieves a TagFileEntry by its tag data string."""
+    def get_entry_by_tag_data(self, tag_data: str) -> Optional[TagFileEntry]:
+        """
+        Retrieves a TagFileEntry by its tag data string (case-insensitive).
+        Returns the canonical entry (the last one loaded/written for that string) if found.
+        """
         return self.entries_by_tag_data.get(tag_data.casefold())
 
     def add_entry(self, entry: TagFileEntry) -> TagFileEntry:
-        entry_tag_data_casefolded = entry.tag_data.casefold()
+        """
+        Adds a TagFileEntry to this TagFile, ensuring uniqueness by string content.
+        This method is primarily used when building a database from scratch or adding
+        new canonical genre strings during modification.
+        """
+        entry_tag_data_casefolded: str = entry.tag_data.casefold()
+
+        # If the string content is not already in our canonical map, add this entry.
         if entry_tag_data_casefolded not in self.entries_by_tag_data:
+            # Add to the main list of entries (will be sorted/written).
             self.entries.append(entry)
+            # Store as the canonical entry for this string.
             self.entries_by_tag_data[entry_tag_data_casefolded] = entry
             return entry
         else:
-            existing_canonical_entry = self.entries_by_tag_data[entry_tag_data_casefolded]
+            # If the string content already exists, return the existing canonical entry.
+            existing_canonical_entry: TagFileEntry = self.entries_by_tag_data[
+                entry_tag_data_casefolded
+            ]
             return existing_canonical_entry
 
-    def __repr__(self):
-        tag_name = TAG_TYPES[self.db_file_type.tag_index]
+    def __repr__(self) -> str:
+        """Provides a developer-friendly string representation of the TagFile object."""
+        tag_name: str = TAG_TYPES[self.db_file_type.tag_index]
         return (
             f"TagFile(type='{tag_name}' ({self.db_file_type.filename}), magic={hex(self.magic)}, "
             f"datasize={self.datasize}, entry_count={self.entry_count}, "
             f"is_filename_db={self.db_file_type.is_filename_db}, "
-            f"entries_len={len(self.entries)}, lookup_len={len(self.entries_by_offset)})"
+            f"entries_len={len(self.entries)}, lookup_offset_len={len(self.entries_by_offset)}, "
+            f"lookup_tagdata_len={len(self.entries_by_tag_data)})"
         )
 
-    def __len__(self):
+    def __len__(self) -> int:
+        """Returns the number of TagFileEntry objects managed by this TagFile."""
         return len(self.entries)
