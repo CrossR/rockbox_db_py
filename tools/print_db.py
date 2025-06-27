@@ -284,7 +284,6 @@ def main():
 
     # Debugging integrity checks
     debug_database_integrity(main_index)
-    return
 
     if args.albums:
         print_album_artist_album_data(main_index)
