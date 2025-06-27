@@ -1,7 +1,9 @@
 # src/rockbox_db_py/classes/music_file.py
 
+from datetime import datetime
 import os
 from typing import Optional, List, Union, Dict, Any  # Added Any for generic type
+
 import mutagen
 from mutagen.asf import ASF
 from mutagen.apev2 import APEv2File as APE
@@ -72,7 +74,7 @@ TAG_EXTRACTION_RULES = [
     ("comment", "comment", _conv_string),
     ("albumartist", "albumartist", _conv_string),
     ("grouping", "grouping", _conv_string),
-    ("year", "date", _conv_int),  # mutagen.File.get('date')
+    ("date", "date", _conv_string),
     ("discnumber", "discnumber", _conv_int),
     ("tracknumber", "tracknumber", _conv_int),
 ]
@@ -98,7 +100,7 @@ class MusicFile:
         comment: Optional[str] = None,
         albumartist: Optional[str] = None,
         grouping: Optional[str] = None,
-        year: Optional[int] = None,
+        date: Optional[str] = None,
         discnumber: Optional[int] = None,
         tracknumber: Optional[int] = None,
         bitrate: Optional[int] = None,
@@ -117,11 +119,27 @@ class MusicFile:
         self.comment: Optional[str] = comment
         self.albumartist: Optional[str] = albumartist
         self.grouping: Optional[str] = grouping
-        self.year: Optional[int] = year
+        self.date: Optional[str] = date
         self.discnumber: Optional[int] = discnumber
         self.tracknumber: Optional[int] = tracknumber
         self.bitrate: Optional[int] = bitrate
         self.length: Optional[int] = length
+
+        # Get some useful derived properties
+        self.filename: str = os.path.basename(filepath)
+        self.file_extension: str = os.path.splitext(filepath)[1].lower()
+
+        self.year = None
+
+        # Attempt to extract year from date if available
+        if self.date:
+            try:
+                # Try to parse date as YYYY-MM-DD or similar formats
+                parsed_date = datetime.strptime(self.date, "%Y-%m-%d")
+                self.year = parsed_date.year
+            except ValueError:
+                # If parsing fails, just store the date string
+                self.year = self.date
 
     @classmethod
     def from_filepath(cls, path: str) -> Optional["MusicFile"]:
