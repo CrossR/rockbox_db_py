@@ -299,11 +299,15 @@ def main():
     if args.genres:
         print("\n--- Unique Genres ---")
         unique_genres = set()
+        genre_count = {}
         for entry in main_index.entries:
-            if valid_entry(entry, "genre"):
-                unique_genres.add(entry.genre)
+            if not valid_entry(entry, "genre"):
+                continue
+            unique_genres.add(entry.genre)
+            genre_count[entry.genre] = genre_count.get(entry.genre, 0) + 1
+
         for genre in sorted(unique_genres):
-            print(genre)
+            print(f"{genre} ({genre_count.get(genre, 0)})")
 
     if args.stats:
         get_db_stats(main_index)

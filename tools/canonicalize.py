@@ -441,6 +441,13 @@ def parse_args() -> argparse.Namespace:
         dest="dry_run",
         help="Perform modifications in-memory, but do not write changes to disk (only prints console output).",
     )
+    parser.add_argument(
+        "--genre-count",
+        type=int,
+        default=5,
+        help="Minimum number of descendants for a genre to be considered for roll-up. "
+             "If a genre has fewer descendants than this, it will roll up to its parent.",
+    )
 
     return parser.parse_args()
 
@@ -460,8 +467,9 @@ def main():
 
     # Get and build the genre canonicalization map
     print("Building genre canonicalization map from:", args.genre_file)
+    roll_up_threshold = args.genre_count
     genre_canonical_map = build_genre_canonical_map(
-        args.genre_file, roll_up_threshold=5
+        args.genre_file, roll_up_threshold=roll_up_threshold
     )
 
     if not genre_canonical_map:
