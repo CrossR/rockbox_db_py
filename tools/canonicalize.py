@@ -446,7 +446,7 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=5,
         help="Minimum number of descendants for a genre to be considered for roll-up. "
-             "If a genre has fewer descendants than this, it will roll up to its parent.",
+        "If a genre has fewer descendants than this, it will roll up to its parent.",
     )
 
     return parser.parse_args()

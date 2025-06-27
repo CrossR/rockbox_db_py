@@ -1,9 +1,9 @@
 # src/rockbox_db_py/classes/tag_file.py
 
 import os
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict  # Used for type hinting
 
-from rockbox_db_py.utils.defs import TAG_TYPES
+from rockbox_db_py.utils.defs import TAG_TYPES, ENCODING  # Ensure ENCODING is imported
 from rockbox_db_py.classes.db_file_type import RockboxDBFileType
 from rockbox_db_py.utils.struct_helpers import read_uint32, write_uint32
 from rockbox_db_py.classes.tag_file_entry import TagFileEntry
@@ -47,6 +47,9 @@ class TagFile:
 
         Returns:
             A new TagFile instance.
+
+        Raises:
+            EOFError: If the end of the file is reached unexpectedly.
         """
         filename: str = os.path.basename(filepath)
         db_file_type: RockboxDBFileType = RockboxDBFileType.from_filename(filename)
@@ -71,20 +74,25 @@ class TagFile:
             tag_file.datasize = datasize_read
             tag_file.entry_count = entry_count_read
 
-            # Read all TagFileEntry instances.
+            # This ensures `tag_file.entries` matches the exact `entry_count` from the header.
+            # Deduplication for functional purposes will happen in `add_entry` or during processing.
             for _ in range(tag_file.entry_count):
                 entry: TagFileEntry = TagFileEntry.from_file(
                     f, is_filename_db=tag_file.db_file_type.is_filename_db
                 )
 
-                # Append entry to the main list (preserving original order and duplicates from file).
-                tag_file.entries.append(entry)
-                # Store entry in lookup by tag data (last one read for a duplicate string becomes canonical).
-                tag_file.entries_by_tag_data[entry.tag_data.casefold()] = entry
-                # Store entry in lookup by offset (maps original offset to specific entry read at that offset).
+                tag_file.entries.append(
+                    entry
+                )  # Add all entries, even string duplicates from file.
+
+                # Store entry in entries_by_offset by its original offset.
+                # This map needs to contain ALL entries read from the file.
                 if entry.offset_in_file is not None:
                     tag_file.entries_by_offset[entry.offset_in_file] = entry
 
+                # Store entry in entries_by_tag_data as canonical lookup.
+                # If duplicates exist, this will store the LAST one read for that string.
+                tag_file.entries_by_tag_data[entry.tag_data.casefold()] = entry
         return tag_file
 
     def to_file(self, filepath: str):

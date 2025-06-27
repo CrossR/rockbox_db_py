@@ -59,38 +59,30 @@ def finalize_index_for_write(main_index: IndexFile):
         for tag_idx in FILE_TAG_INDICES:
             tag_name_str: str = TagTypeEnum(tag_idx).name
 
-            # Get the current string value of the tag from the IndexFileEntry.
-            current_tag_value_str: Optional[str] = getattr(index_entry, tag_name_str)
-
-            # Get the corresponding TagFile object.
-            # Its entries and offsets are correctly established from its recent write to disk.
-            target_tag_file_obj: Optional[TagFile] = main_index.loaded_tag_files.get(
+            current_tag_seek_value: Union[int, TagFileEntry] = index_entry.tag_seek[
                 tag_idx
-            )
+            ]
 
-            if target_tag_file_obj is None:
-                print(
-                    f"  Warning: TagFile for index {tag_idx} ({tag_name_str}) not loaded. Setting tag_seek to sentinel for related entries."
-                )
-                index_entry.tag_seek[tag_idx] = 0xFFFFFFFF
-                continue
+            # Case 1: The tag_seek is currently a TagFileEntry object (this tag was modified)
+            # Case 2: The tag_seek is already an integer offset (e.g., loaded from file, or not modified)
+            # Case 3: The tag_seek is None or an unexpected type (set to sentinel value)
+            if isinstance(current_tag_seek_value, TagFileEntry):
+                target_tag_entry_in_file: TagFileEntry = current_tag_seek_value
 
-            target_tag_entry_in_file: Optional[TagFileEntry] = None
-            if current_tag_value_str is not None:
-                # Find the TagFileEntry by its string data from the now-written TagFile.
-                target_tag_entry_in_file = target_tag_file_obj.get_entry_by_tag_data(
-                    current_tag_value_str
-                )
-
-            if (
-                target_tag_entry_in_file
-                and target_tag_entry_in_file.offset_in_file is not None
-            ):
-                # Set the tag_seek to the actual numerical offset from the *newly written* TagFile.
-                index_entry.tag_seek[tag_idx] = target_tag_entry_in_file.offset_in_file
+                # Ensure the TagFileEntry has a valid offset_in_file.
+                # If it was modified, it should have been written to a file.
+                # If it has no offset, we set it to 0xFFFFFFFF as a sentinel
+                if target_tag_entry_in_file.offset_in_file is not None:
+                    index_entry.tag_seek[tag_idx] = (
+                        target_tag_entry_in_file.offset_in_file
+                    )
+                else:
+                    index_entry.tag_seek[tag_idx] = 0xFFFFFFFF
+            elif isinstance(current_tag_seek_value, int):
+                # Check for '0' offset, which can be ambiguous but often means 'no data' for strings.
+                if current_tag_seek_value == 0:
+                    index_entry.tag_seek[tag_idx] = 0xFFFFFFFF
             else:
-                # If tag data is None, or entry not found in TagFile (e.g., if string didn't exist),
-                # set the tag_seek to the sentinel value (0xFFFFFFFF).
                 index_entry.tag_seek[tag_idx] = 0xFFFFFFFF
 
 
