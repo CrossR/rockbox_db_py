@@ -7,7 +7,7 @@ from typing import Optional, List, Dict
 # Imports for Rockbox DB classes
 from rockbox_db_py.classes.db_file_type import RockboxDBFileType
 from rockbox_db_py.classes.index_file import IndexFile
-from rockbox_db_py.classes.music_file import MusicFile
+from rockbox_db_py.classes.music_file import MusicFile, SUPPORTED_MUSIC_EXTENSIONS
 from rockbox_db_py.classes.tag_file import TagFile
 from rockbox_db_py.classes.tag_file_entry import TagFileEntry
 from rockbox_db_py.utils.defs import TagTypeEnum, FILE_TAG_INDICES
@@ -165,6 +165,11 @@ def scan_music_directory(directory_path: str) -> List[MusicFile]:
     for root, _, files in os.walk(directory_path):
         for file in files:
             file_path: str = os.path.join(root, file)
+
+            extension = os.path.splitext(file_path)[1].lower()
+            if extension not in SUPPORTED_MUSIC_EXTENSIONS:
+                continue
+
             music_file: Optional[MusicFile] = MusicFile.from_filepath(file_path)
 
             if music_file:
@@ -173,7 +178,9 @@ def scan_music_directory(directory_path: str) -> List[MusicFile]:
             else:
                 skipped_count += 1
 
-    print(
-        f"--- Scan complete. Processed {processed_count} music files, skipped {skipped_count}. ---"
-    )
+    if skipped_count > 0:
+        print(
+            f"Skipped {skipped_count} files that could not be parsed as MusicFile objects."
+        )
+
     return music_files

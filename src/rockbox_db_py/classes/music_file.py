@@ -20,6 +20,20 @@ from rockbox_db_py.utils.utils import mtime_to_fat  # For FAT32 mtime conversion
 # These are passed to mutagen.File to help it identify file types.
 SUPPORTED_MUTAGEN_FORMATS = [ASF, APE, FLAC, ID3, MP3, Vorbis, WavPack, MP4, Musepack]
 
+# Commonly used extensions for the above formats.
+SUPPORTED_MUSIC_EXTENSIONS: List[str] = [
+    ".mp3",
+    ".flac",
+    ".ogg",
+    ".wav",
+    ".ape",
+    ".wv",
+    ".m4a",
+    ".mp4",
+    ".musepack",
+    ".mpc",
+]
+
 
 class _MusicFileTags:
     """
