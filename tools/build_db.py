@@ -18,14 +18,13 @@
 
 import argparse
 import os
+import multiprocessing
 
 from rockbox_db_py.utils.helpers import (
     load_rockbox_database,
     write_rockbox_database,
     scan_music_directory,
 )
-
-from typing import Optional
 
 
 def parse_args():
@@ -47,6 +46,14 @@ def parse_args():
         type=str,
         help="Path to the directory where the new database files will be written (will be cleaned if it exists).",
     )
+
+    # Optional args
+    parser.add_argument(
+        "--num_processes",
+        type=int,
+        default=None,
+        help="Number of processes to use for parsing music files. Defaults to all available CPU cores.",
+    )
     parser.add_argument(
         "--stats",
         action="store_true",
@@ -64,7 +71,9 @@ def main():
     output_db_dir = args.output_db_dir
 
     print(f"Processing music files from: {input_music_dir}")
-    music_files = scan_music_directory(input_music_dir)
+    music_files = scan_music_directory(
+        input_music_dir, num_processes=args.num_processes
+    )
 
     if not music_files:
         print("No music files found to index. Exiting.")
@@ -72,8 +81,22 @@ def main():
 
     print(f"Found {len(music_files)} music files to index.")
 
+    # Debug print the first 10 music files
+    print("First 10 music files:")
+    for i, music_file in enumerate(music_files[:10]):
+        print(f"{i + 1}: {music_file.filepath} - {music_file.title or 'No Title'}")
+        print(f"    Album: {music_file.album or 'No Album'}")
+        print(f"    Artist: {music_file.artist or 'No Artist'}")
+        print(f"    Track: {music_file.tracknumber or 'No Track Number'}")
+        print(f"    Genre: {music_file.genre or 'No Genre'}")
+        print(f"    Year: {music_file.year or 'Unknown'}")
+        print(f"    Length: {music_file.length} seconds")
+        print(f"    Bitrate: {music_file.bitrate} bps")
+
+
     print("Finished!")
 
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     main()
