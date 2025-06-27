@@ -10,26 +10,12 @@ from rockbox_db_py.classes.db_file_type import RockboxDBFileType
 from rockbox_db_py.classes.tag_file import TagFile
 from rockbox_db_py.classes.index_file import IndexFile
 from rockbox_db_py.utils.defs import TagTypeEnum, FLAG_DELETED, FILE_TAG_INDICES
+from rockbox_db_py.utils.helpers import load_rockbox_database
 
 
 def valid_entry(entry, prop) -> bool:
     """Check if the entry is valid (not deleted and has the specified property)."""
     return not (entry.flag & FLAG_DELETED) and getattr(entry, prop) is not None
-
-
-def load_rockbox_database(db_directory: str) -> IndexFile:
-    """Loads all Rockbox database files from the specified directory and prints their contents."""
-
-    # 1. Load the index file.
-    #    All the tag files will be loaded along with it when calling from_file().
-    index_filepath = os.path.join(db_directory, RockboxDBFileType.INDEX.filename)
-    try:
-        main_index = IndexFile.from_file(index_filepath)
-    except Exception as e:
-        print(f"\nError loading {RockboxDBFileType.INDEX.filename}: {e}")
-        return
-
-    return main_index
 
 
 def print_album_artist_album_data(main_index: IndexFile):

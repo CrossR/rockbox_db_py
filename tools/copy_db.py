@@ -2,19 +2,23 @@
 #
 # This script is useful for verifying the code can correctly both load and write
 # a set of Rockbox database files.
+#
+# Given an input rockbox DB, it will read and then write out a new set of files
+# to a specified output directory. It will then compare the original files with
+# the newly written files to ensure they match byte-for-byte.
 
 import argparse
 import os
-import shutil
 import filecmp
 
 from rockbox_db_py.classes.db_file_type import RockboxDBFileType
 from rockbox_db_py.classes.index_file import IndexFile
-from rockbox_db_py.classes.tag_file import (
-    TagFile,
+from rockbox_db_py.utils.helpers import (
+    load_rockbox_database,
+    write_rockbox_database,
 )
 
-from typing import Dict
+from typing import Optional
 
 
 def load_and_write_rockbox_database(
@@ -22,57 +26,30 @@ def load_and_write_rockbox_database(
     output_db_dir: str,
 ):
     """
-    Loads a Rockbox database from input_db_dir and writes it to output_db_dir.
+    Loads a Rockbox database from input_db_dir and writes it to output_db_dir
+    using the new helper functions.
     """
     print(f"--- Processing Rockbox database ---")
     print(f"Input Directory: {input_db_dir}")
     print(f"Output Directory: {output_db_dir}")
 
-    # Ensure output directory exists and is empty (or clean it)
+    # The directory cleaning and creation logic is now handled by write_rockbox_database
+    # but let's replicate the print for consistency with the original function's output.
     if os.path.exists(output_db_dir):
         print(f"Cleaning existing output directory: {output_db_dir}")
-        shutil.rmtree(output_db_dir)
-    os.makedirs(output_db_dir, exist_ok=True)
 
-    # 1. Load the database
-    index_filepath = os.path.join(input_db_dir, RockboxDBFileType.INDEX.filename)
-    main_index: IndexFile = None
+    # 1. Load the database using the helper function
+    main_index: Optional[IndexFile] = load_rockbox_database(input_db_dir)
+
+    if main_index is None:
+        print("Failed to load the Rockbox database.")
+        return  # Exit if loading failed
+
+    # 2. Write the database to the new location using the helper function
+    # auto_finalize is True by default in write_rockbox_database
     try:
-        print(f"\nLoading database from '{input_db_dir}'...")
-        main_index = IndexFile.from_file(index_filepath)
-        print(f"Successfully loaded {main_index.db_file_type.filename}: {main_index}")
-    except FileNotFoundError as e:
-        print(f"Error: Input database file not found: {e}")
-        return
-    except Exception as e:
-        print(f"Error loading database: {e}")
-        return
-
-    # 2. Write the database to the new location
-    print(f"\nWriting database to '{output_db_dir}'...")
-    try:
-        # Write the main index file
-        output_index_filepath = os.path.join(
-            output_db_dir, RockboxDBFileType.INDEX.filename
-        )
-        main_index.to_file(output_index_filepath)
-        print(f"Successfully wrote {RockboxDBFileType.INDEX.filename}")
-
-        # Write all associated tag files
-        # main_index._loaded_tag_files holds TagFile objects (tag_index: TagFile instance)
-        loaded_tag_files: Dict[int, TagFile] = (
-            main_index.loaded_tag_files
-        )  # Access via public property
-        for tag_index, tag_file_obj in loaded_tag_files.items():
-            db_file_type = RockboxDBFileType.from_tag_index(
-                tag_index
-            )  # Get the enum member
-            output_tag_filepath = os.path.join(output_db_dir, db_file_type.filename)
-            tag_file_obj.to_file(output_tag_filepath)
-            print(f"Successfully wrote {db_file_type.filename}")
-
-        print("\nDatabase writing complete.")
-
+        write_rockbox_database(main_index, output_db_dir)
+        print("\nDatabase writing and saving complete.")  # Added for clarity
     except Exception as e:
         print(f"Error writing database: {e}")
         return
@@ -239,8 +216,6 @@ def compare_parsed_dbs(original_db: IndexFile, written_db: IndexFile):
                         f"        ❌ Prop '{prop}': Original={orig_prop_val} | Written={written_prop_val}"
                     )
                     tag_file_match = False
-                # else:
-                #     print(f"        ✅ Prop '{prop}': {orig_prop_val}")
 
             # Optionally, compare the entries within the TagFile objects
             if len(orig_tag_file.entries) != len(written_tag_file.entries):
@@ -311,8 +286,12 @@ def main():
         success = compare_files(args.input_db_dir, args.output_db_dir)
         if not success:
             compare_parsed_dbs(
-                IndexFile.from_file(os.path.join(args.input_db_dir, RockboxDBFileType.INDEX.filename)),
-                IndexFile.from_file(os.path.join(args.output_db_dir, RockboxDBFileType.INDEX.filename)),
+                IndexFile.from_file(
+                    os.path.join(args.input_db_dir, RockboxDBFileType.INDEX.filename)
+                ),
+                IndexFile.from_file(
+                    os.path.join(args.output_db_dir, RockboxDBFileType.INDEX.filename)
+                ),
             )
 
     print("\n--- Process finished ---")

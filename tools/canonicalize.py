@@ -23,27 +23,7 @@ from rockbox_db_py.classes.index_file import IndexFile
 from rockbox_db_py.utils.defs import TagTypeEnum, FILE_TAG_INDICES, FLAG_DELETED
 from rockbox_db_py.classes.tag_file import TagFile
 from rockbox_db_py.classes.tag_file_entry import TagFileEntry
-
-
-def load_rockbox_database(db_directory: str) -> Optional[IndexFile]:
-    """
-    Loads the Rockbox database from the specified directory.
-    This includes the main index file and all associated tag data files.
-    """
-    print(f"--- Loading Rockbox database from: {db_directory} ---")
-
-    index_filepath: str = os.path.join(db_directory, RockboxDBFileType.INDEX.filename)
-    try:
-        main_index: IndexFile = IndexFile.from_file(index_filepath)
-        print(f"Successfully loaded {main_index.db_file_type.filename}: {main_index}")
-    except FileNotFoundError as e:
-        print(f"Error: Input database directory or index file not found: {e}")
-        return None
-    except Exception as e:
-        print(f"Error loading database: {e}")
-        return None
-
-    return main_index
+from rockbox_db_py.utils.helpers import load_rockbox_database, write_rockbox_database
 
 
 def build_genre_canonical_map(
@@ -77,15 +57,14 @@ def build_genre_canonical_map(
         with open(genre_map_filepath, "r", encoding="utf-8") as f:
             genre_data = yaml.safe_load(f)
     except FileNotFoundError:
-        print(f"Error: Genre mapping file not found at '{genre_map_filepath}'.")
-        return {}
+        raise FileNotFoundError(
+            f"Genre mapping file '{genre_map_filepath}' does not exist."
+        )
     except yaml.YAMLError as e:
-        print(f"Error parsing genre mapping YAML file: {e}")
-        return {}
+        raise yaml.YAMLError(f"Error parsing YAML file '{genre_map_filepath}': {e}")
 
     if not isinstance(genre_data, list):
-        print("Error: Genre mapping YAML should be a list of top-level genres.")
-        return {}
+        raise ValueError("Genre mapping YAML should be a list of top-level genres.")
 
     # --- Pass 1: Build a flattened graph (all_genre_nodes) with parents and depths ---
     # Use a queue for BFS traversal (current_yaml_node, parent_name, depth)
@@ -269,15 +248,6 @@ def build_genre_canonical_map(
 
         canonical_map[genre_name_lower] = canonical_parent
 
-    print(
-        f"\n--- Genre Canonical Map Built (Roll-up Threshold: {roll_up_threshold}) ({len(canonical_map)} entries) ---"
-    )
-
-    # Final genres
-    unique_canonical_genres = set(canonical_map.values())
-    print(f"Unique canonical genres ({len(unique_canonical_genres)}):")
-    print(unique_canonical_genres)
-
     return canonical_map
 
 
@@ -369,7 +339,6 @@ def perform_single_genre_canonicalization(
     For each track, it determines a single canonical genre and updates the entry.
     Original entries are modified directly; no new IndexFileEntries are created.
     """
-    print("\n--- Performing Single Genre Canonicalization (Actual Changes) ---")
 
     modified_entries_count: int = 0
 
@@ -378,10 +347,10 @@ def perform_single_genre_canonicalization(
 
     genre_tag_file: Optional[TagFile] = main_index.loaded_tag_files.get(genre_tag_index)
     if not genre_tag_file:
-        print(
-            f"Error: Genre tag file ({genre_file_type.filename}) not loaded. Cannot modify genres."
+        raise ValueError(
+            f"Genre TagFile (database_2.tcd) not found in the loaded database. "
+            f"Ensure the database is loaded correctly and contains a genre tag file."
         )
-        return
 
     for i, entry_to_modify in enumerate(main_index.entries):
         # Skip entries that are marked as DELETED.
@@ -400,9 +369,6 @@ def perform_single_genre_canonicalization(
 
         if not chosen_canonical_genre:
             # No genre was chosen (either original was empty or no valid canonical genre found).
-            print(
-                f"\nEntry (Index {i}): no canonical genre found, skipping modification"
-            )
             continue
 
         # Check if a modification is needed.
@@ -417,12 +383,6 @@ def perform_single_genre_canonicalization(
 
         if chosen_canonical_genre_casefolded != original_genre_casefolded:
             modified_entries_count += 1
-            print(f"\nProcessing entry (Index {i}):")
-            print(f"  Original Genre: '{original_genre_str}'")
-            print(
-                f"  Track: '{entry_to_modify.title}' (File: '{entry_to_modify.filename}')"
-            )
-            print(f"  Canonicalizing genre to: '{chosen_canonical_genre}'")
 
             # Ensure the TagFileEntry for this chosen canonical genre exists in the genre TagFile.
             # TagFile.add_entry handles creating new entries or returning existing ones.
@@ -432,11 +392,6 @@ def perform_single_genre_canonicalization(
 
             # Update the IndexFileEntry's genre pointer.
             entry_to_modify.tag_seek[genre_tag_index] = target_genre_tag_entry
-        else:
-            # If no modification is needed (genre is already canonical or original_genre_str was empty and no canonical was found).
-            print(
-                f"\nProcessing entry (Index {i}): '{original_genre_str if original_genre_str else '(None)'}' (no change needed)"
-            )
 
     # Cleanse the genre TagFile (database_2.tcd) of multi-value strings.
     initial_genre_entries_count: int = len(genre_tag_file.entries)
@@ -455,130 +410,6 @@ def perform_single_genre_canonicalization(
     genre_tag_file.entries_by_tag_data = {}
     for entry in genre_tag_file.entries:
         genre_tag_file.entries_by_tag_data[entry.tag_data.casefold()] = entry
-
-    print(f"\n--- Genre TagFile Cleanup ---")
-    print(f"  Original genre_tag_file entries count: {initial_genre_entries_count}")
-    print(
-        f"  Multi-value genre strings removed from genre_tag_file: {removed_genre_strings_count}"
-    )
-    print(f"  Final genre_tag_file entries count: {len(genre_tag_file.entries)}")
-
-    if modified_entries_count == 0:
-        print("No genre entries found needing modification or canonicalization.")
-    else:
-        print(f"\n--- Single Genre Canonicalization Complete ---")
-        print(f"Total entries modified: {modified_entries_count}")
-        print(f"Database now has {len(main_index.entries)} entries (count unchanged).")
-
-
-def finalize_index_for_write(main_index: IndexFile):
-    """
-    Ensures all file-based tag_seek values in IndexFileEntries point to valid
-    numerical offsets (from the newly written TagFiles) before writing the IndexFile.
-    """
-    print("\nFinalizing IndexFileEntry tag_seek values for writing...")
-
-    # Iterate through all entries in the database.
-    for index_entry in main_index.entries:
-        # Iterate through ALL file-based tags to update their offsets.
-        for tag_idx in FILE_TAG_INDICES:
-            tag_name_str: str = TagTypeEnum(tag_idx).name
-
-            # Get the current string value of the tag from the IndexFileEntry.
-            current_tag_value_str: Optional[str] = getattr(index_entry, tag_name_str)
-
-            # Get the corresponding TagFile object.
-            # Its entries and offsets are correctly established from its recent write to disk.
-            target_tag_file_obj: Optional[TagFile] = main_index.loaded_tag_files.get(
-                tag_idx
-            )
-
-            if target_tag_file_obj is None:
-                print(
-                    f"  Warning: TagFile for index {tag_idx} ({tag_name_str}) not loaded. Setting tag_seek to sentinel for related entries."
-                )
-                index_entry.tag_seek[tag_idx] = 0xFFFFFFFF
-                continue
-
-            target_tag_entry_in_file: Optional[TagFileEntry] = None
-            if current_tag_value_str is not None:
-                # Find the TagFileEntry by its string data from the now-written TagFile.
-                target_tag_entry_in_file = target_tag_file_obj.get_entry_by_tag_data(
-                    current_tag_value_str
-                )
-
-            if (
-                target_tag_entry_in_file
-                and target_tag_entry_in_file.offset_in_file is not None
-            ):
-                index_entry.tag_seek[tag_idx] = target_tag_entry_in_file.offset_in_file
-            else:
-                # If tag data is None, or entry not found in TagFile (e.g., if string didn't exist),
-                # set the tag_seek to the sentinel value (0xFFFFFFFF).
-                index_entry.tag_seek[tag_idx] = 0xFFFFFFFF
-
-
-def save_modified_database(main_index: IndexFile, output_db_dir: str):
-    """
-    Saves the modified Rockbox database (IndexFile and its associated TagFiles)
-    to the specified output directory.
-    """
-    print(f"\n--- Saving modified database to: {output_db_dir} ---")
-
-    # Ensure output directory exists and is ready for writing.
-    if not os.path.exists(output_db_dir):
-        try:
-            os.makedirs(output_db_dir)
-            print(f"Created output directory: {output_db_dir}")
-        except OSError as e:
-            print(f"Error creating output directory: {e}")
-            raise
-
-    elif os.path.exists(output_db_dir) and os.listdir(output_db_dir):
-        print(f"Output directory {output_db_dir} already exists. Clearing it...")
-        try:
-            shutil.rmtree(output_db_dir)
-            os.makedirs(output_db_dir)
-            print(f"Cleared and recreated output directory: {output_db_dir}")
-        except OSError as e:
-            print(f"Error clearing output directory: {e}")
-            raise
-
-    try:
-        # Write all associated tag files FIRST.
-        # This is critical as it assigns correct `offset_in_file` values
-        # to the TagFileEntry objects, including any newly added ones.
-        loaded_tag_files: Dict[int, TagFile] = main_index.loaded_tag_files
-        for tag_index, tag_file_obj in loaded_tag_files.items():
-            if not tag_file_obj:
-                continue
-            db_file_type: RockboxDBFileType = RockboxDBFileType.from_tag_index(
-                tag_index
-            )
-            output_tag_filepath: str = os.path.join(
-                output_db_dir, db_file_type.filename
-            )
-            tag_file_obj.to_file(
-                output_tag_filepath
-            )  # This updates entry.offset_in_file for all entries
-            print(f"Successfully wrote {db_file_type.filename} (and updated offsets)")
-
-        # After TagFiles are written and their offsets are updated,
-        # finalize IndexFile entries to point to the *new* numerical offsets.
-        finalize_index_for_write(main_index)
-
-        # Write the main index file.
-        output_index_filepath: str = os.path.join(
-            output_db_dir, RockboxDBFileType.INDEX.filename
-        )
-        main_index.to_file(output_index_filepath)
-        print(f"Successfully wrote {RockboxDBFileType.INDEX.filename}")
-
-        print("\nModified database saved successfully.")
-
-    except Exception as e:
-        print(f"Error saving modified database: {e}")
-        raise  # Re-raise the exception to indicate failure
 
 
 def parse_args() -> argparse.Namespace:
@@ -619,13 +450,16 @@ def main():
     args = parse_args()
 
     # Load the database
-    main_index: IndexFile = load_rockbox_database(args.db_path)
+    print("Loading Rockbox database from:", args.db_path)
+    main_index = load_rockbox_database(args.db_path)
 
     if main_index is None:
         print("Failed to load the Rockbox database. Exiting.")
         return
+    print("Rockbox database loaded successfully.")
 
     # Get and build the genre canonicalization map
+    print("Building genre canonicalization map from:", args.genre_file)
     genre_canonical_map = build_genre_canonical_map(
         args.genre_file, roll_up_threshold=5
     )
@@ -633,20 +467,31 @@ def main():
     if not genre_canonical_map:
         print("No genre mappings found in the provided genre file. Exiting.")
         return
+    print("Genre canonicalization map built successfully.")
 
     # Perform the genre canonicalization modification
+    print("Performing genre canonicalization on the database entries...")
     perform_single_genre_canonicalization(main_index, genre_canonical_map)
+    print("Genre canonicalization complete.")
 
     if args.dry_run:
-        print("\n--- Dry run complete. No changes written to the database. ---")
+        print("Dry run complete. No changes written to disk.")
         return
 
     # Save the modified database if not a dry run
     try:
-        save_modified_database(main_index, args.output_db_path)
+        print("Saving modified Rockbox database to:", args.output_db_path)
+        write_rockbox_database(main_index, args.output_db_path)
     except Exception as e:
         print(f"Failed to save modified database: {e}")
         sys.exit(1)
+
+    print("Modified database saved successfully.")
+    print(
+        f"Total entries modified: {len(main_index.entries)}. "
+        f"Genre entries: {len(main_index.loaded_tag_files[TagTypeEnum.genre.value].entries)}."
+    )
+    print("Genre canonicalization complete.")
 
 
 if __name__ == "__main__":
