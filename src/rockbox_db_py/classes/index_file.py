@@ -25,7 +25,7 @@ class IndexFile:
         self.datasize: int = 0
         self.entry_count: int = 0
         self.serial: int = 0
-        self.commitid: int = 0
+        self.commitid: int = 1
         self.dirty: int = 0
         self.entries: List[IndexFileEntry] = []
         self._loaded_tag_files: Dict[int, TagFile] = {}

@@ -2,7 +2,7 @@
 
 from datetime import datetime
 import os
-from typing import Optional, List, Union, Dict, Any  # Added Any for generic type
+from typing import Optional, List, Dict, Any
 
 import mutagen
 from mutagen.asf import ASF
@@ -15,7 +15,7 @@ from mutagen.wavpack import WavPack
 from mutagen.mp4 import MP4
 from mutagen.musepack import Musepack
 
-from rockbox_db_py.utils.utils import mtime_to_fat  # For FAT32 mtime conversion
+from rockbox_db_py.utils.utils import mtime_to_fat
 
 
 # Define supported formats for mutagen.File.
@@ -129,6 +129,10 @@ class MusicFile:
         self.filename: str = os.path.basename(filepath)
         self.file_extension: str = os.path.splitext(filepath)[1].lower()
 
+        self.grouping = self.title if self.grouping is None else self.grouping
+        self.canonicalartist = self.artist if self.artist else self.albumartist
+        self.composer = self.composer if self.composer else self.artist
+
         self.year = None
 
         # Attempt to extract year from date if available
@@ -138,8 +142,8 @@ class MusicFile:
                 parsed_date = datetime.strptime(self.date, "%Y-%m-%d")
                 self.year = parsed_date.year
             except ValueError:
-                # If parsing fails, just store the date string
-                self.year = self.date
+                # If parsing fails, just convert the str to an int
+                self.year = int(self.date) if self.date.isdigit() else None
 
     @classmethod
     def from_filepath(cls, path: str) -> Optional["MusicFile"]:
@@ -153,6 +157,7 @@ class MusicFile:
             modtime_unix: int = int(stat_info.st_mtime)
 
             mutagen_tags: Optional[mutagen.File] = mutagen.File(path, easy=True)
+            mutagen_tags_all: Optional[mutagen.File] = mutagen.File(path).tags
 
             if mutagen_tags is None:
                 print(f"Unsupported file format or no tags found for: {path}")
@@ -174,6 +179,21 @@ class MusicFile:
                     extracted_tags[attr_name] = converter_func(raw_value)
                 except (AttributeError, KeyError, ValueError, IndexError) as e:
                     extracted_tags[attr_name] = None
+
+            if extracted_tags.get("comment") is None:
+                # If no comment tag found, try to extract from COMM tags
+                # 'XXX' is the default language for comments in mutagen
+                for comment in (mutagen_tags_all.getall("COMM") or []):
+                    if comment.lang == "XXX":  # 'XXX' is the default language for comments in mutagen
+                        comment_str = str(comment.text[0])
+
+                        # If the comment is empty, skip it
+                        if comment_str:
+                            # Cut it down to 255 characters if it's too long
+                            if len(comment_str) > 255:
+                                comment_str = comment_str[:255]
+                            extracted_tags["comment"] = comment_str
+                            break
 
             # Create MusicFile instance, passing extracted tags as keyword arguments
             return cls(
