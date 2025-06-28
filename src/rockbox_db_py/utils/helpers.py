@@ -298,8 +298,8 @@ def build_rockbox_database_from_music_files(
             # For the actual song-specific tag data, we need to ensure
             # we pass over an IDX. For others....we want to pass over the known
             # empty value.
-            if tag_idx in [TagTypeEnum.title.value]:
-                computed_idx = song_idx + 1
+            if tag_idx in [TagTypeEnum.title.value, TagTypeEnum.filename.value]:
+                computed_idx = song_idx
             else:
                 computed_idx = 0xFFFFFFFF
 
