@@ -121,8 +121,7 @@ def write_rockbox_database(
         # to the TagFileEntry objects, including any newly added ones.
         loaded_tag_files: Dict[int, TagFile] = main_index.loaded_tag_files
         for tag_index, tag_file_obj in loaded_tag_files.items():
-            if not tag_file_obj:
-                continue
+
             db_file_type: RockboxDBFileType = RockboxDBFileType.from_tag_index(
                 tag_index
             )
@@ -310,8 +309,7 @@ def build_rockbox_database_from_music_files(
                 target_tag_entry: TagFileEntry = tag_file_for_this_tag.add_entry(
                     TagFileEntry(
                         tag_data=processed_tag_value,
-                        is_filename_db=tag_file_for_this_tag.db_file_type
-                        == RockboxDBFileType.FILENAME,
+                        db_file_type=RockboxDBFileType.from_tag_index(tag_idx),
                         unique_id=unique_id,
                         idx_id=computed_idx,
                     )

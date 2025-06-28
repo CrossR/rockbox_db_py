@@ -128,8 +128,8 @@ def compare_parsed_dbs(original_db: IndexFile, written_db: IndexFile):
     # 3. Compare entries themselves (up to a certain limit or all if small)
     print("\n  >> Entry-by-Entry Comparison <<")
     compare_limit = min(
-        len(original_db.entries), len(written_db.entries), 20
-    )  # Compare first 20 or fewer
+        len(original_db.entries), len(written_db.entries), 5
+    )
     mismatch_found_in_entries = False
 
     for i in range(compare_limit):

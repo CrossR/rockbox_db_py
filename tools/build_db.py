@@ -23,7 +23,6 @@ from rockbox_db_py.utils.helpers import (
     scan_music_directory,
     build_rockbox_database_from_music_files,
 )
-from rockbox_db_py.classes.db_file_type import RockboxDBFileType
 
 
 def parse_args():
@@ -94,26 +93,6 @@ def main():
         output_rockbox_path_prefix=args.output_rockbox_path,
     )
     print("Rockbox database built in memory.")
-
-    # DEBUG: Check number of tag files loaded
-    print(f"Number of tag files loaded: {len(main_index._loaded_tag_files)}")
-    for tag_index, tag_file in main_index._loaded_tag_files.items():
-        tag_file.db_file_type: RockboxDBFileType = tag_file.db_file_type
-
-        # If not a comment or title tag file, print basic info
-        if tag_file.db_file_type.tag_index not in [3, 6]:
-            print(
-                f"Tag File {tag_index} ({tag_file.db_file_type.filename}): "
-                f"Entries: {len(tag_file.entries)}, "
-                f"Magic: {hex(tag_file.magic)}, "
-                f"Data Size: {tag_file.datasize}, "
-                f"Is Filename DB: {tag_file.db_file_type.is_filename_db}"
-            )
-            continue
-
-        print(tag_file)
-        for entry in tag_file.entries:
-            print(f"  Entry {entry.idx_id}: {entry.tag_data} ")
 
     # Write the database to the output directory
     print(f"Writing Rockbox database to: {output_db_dir}")

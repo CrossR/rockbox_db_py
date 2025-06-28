@@ -387,7 +387,7 @@ def perform_single_genre_canonicalization(
             # Ensure the TagFileEntry for this chosen canonical genre exists in the genre TagFile.
             # TagFile.add_entry handles creating new entries or returning existing ones.
             target_genre_tag_entry: TagFileEntry = genre_tag_file.add_entry(
-                TagFileEntry(tag_data=chosen_canonical_genre, is_filename_db=False)
+                TagFileEntry(tag_data=chosen_canonical_genre)
             )
 
             # Update the IndexFileEntry's genre pointer.
