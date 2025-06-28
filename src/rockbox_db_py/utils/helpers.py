@@ -61,8 +61,6 @@ def finalize_index_for_write(main_index: IndexFile):
 
         # Iterate through ALL file-based tags to update their offsets.
         for tag_idx in FILE_TAG_INDICES:
-            tag_name_str: str = TagTypeEnum(tag_idx).name
-
             current_tag_seek_value: Union[int, TagFileEntry] = index_entry.tag_seek[
                 tag_idx
             ]
@@ -237,7 +235,9 @@ def build_rockbox_database_from_music_files(
         main_index._loaded_tag_files[db_type.tag_index] = tag_file
 
     # Process each MusicFile to create IndexFileEntry and populate TagFiles.
-    for music_file in tqdm(music_files, desc="Processing music files into DB"):
+    for song_idx, music_file in tqdm(
+        enumerate(music_files), desc="Processing music files into DB"
+    ):
         new_index_entry: IndexFileEntry = IndexFileEntry(tag_seek=[0] * TAG_COUNT)
 
         # Populate embedded numeric tags directly from MusicFile.
@@ -262,6 +262,9 @@ def build_rockbox_database_from_music_files(
         # Other numeric fields (playcount, rating, playtime, lastplayed, commitid, lastelapsed, lastoffset)
         # will default to 0, which is acceptable for a new database.
 
+        # Generate a unique ID for this entry.
+        unique_id: str = music_file.generate_unique_id()
+
         # Populate file-based string tags.
         for tag_idx in FILE_TAG_INDICES:
             tag_name_str: str = TagTypeEnum(tag_idx).name
@@ -285,11 +288,21 @@ def build_rockbox_database_from_music_files(
 
             # General handling for other string tags.
             else:
-                tag_value_from_music_file: Optional[str] = getattr(music_file, tag_name_str)
+                tag_value_from_music_file: Optional[str] = getattr(
+                    music_file, tag_name_str
+                )
                 if tag_value_from_music_file is not None:
                     processed_tag_value = tag_value_from_music_file
                 else:
                     processed_tag_value = None
+
+            # For the actual song-specific tag data, we need to ensure
+            # we pass over an IDX. For others....we want to pass over the known
+            # empty value.
+            if tag_idx in [TagTypeEnum.title.value]:
+                computed_idx = song_idx + 1
+            else:
+                computed_idx = 0xFFFFFFFF
 
             # Add processed tag value to the corresponding TagFile.
             if processed_tag_value is not None:
@@ -299,6 +312,8 @@ def build_rockbox_database_from_music_files(
                         tag_data=processed_tag_value,
                         is_filename_db=tag_file_for_this_tag.db_file_type
                         == RockboxDBFileType.FILENAME,
+                        unique_id=unique_id,
+                        idx_id=computed_idx,
                     )
                 )
                 new_index_entry.tag_seek[tag_idx] = target_tag_entry

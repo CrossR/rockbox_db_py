@@ -22,11 +22,25 @@ class TagFileEntry:
         idx_id: int = 0xFFFFFFFF,
         is_filename_db: bool = False,
         offset_in_file: Optional[int] = None,
+        unique_id: Optional[str] = None,
     ):
         self.tag_data = tag_data
         self.idx_id = idx_id
         self.is_filename_db = is_filename_db
         self.offset_in_file = offset_in_file
+
+        # A unique ID, used for de-duplication and tracking.
+        self.unique_id = unique_id
+
+    @property
+    def key(self) -> str:
+        """
+        Returns a unique key for this entry based on its tag data and idx_id.
+        This is used for de-duplication and quick lookups.
+        """
+        if self.unique_id:
+            return self.unique_id
+        return self.tag_data
 
     @classmethod
     def from_file(cls, f, is_filename_db: bool = False):

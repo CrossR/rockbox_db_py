@@ -244,14 +244,14 @@ def compare_parsed_dbs(original_db: IndexFile, written_db: IndexFile):
                     f"        ❌ Original tag file '{tag_filename}' has {len(orig_uniques)} unique entries:"
                 )
                 tag_file_match = False
-                for entry in orig_uniques:
+                for entry in list(orig_uniques)[:5]:  # Show first 5 unique entries
                     print(f"          - Unique Original Entry: {entry}")
             if len(written_uniques) > 0:
                 print(
                     f"        ❌ Written tag file '{tag_filename}' has {len(written_uniques)} unique entries:"
                 )
                 tag_file_match = False
-                for entry in written_uniques:
+                for entry in list(written_uniques)[:5]:
                     print(f"          - Unique Written Entry: {entry}")
 
             # Optionally, compare the entries within the TagFile objects

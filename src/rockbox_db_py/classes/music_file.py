@@ -61,6 +61,42 @@ def _conv_int(value: Any) -> Optional[int]:
     except (ValueError, TypeError):
         return None
 
+def _extract_comment_value(mutagen_tags: mutagen.File) -> Optional[str]:
+    """Robustly attempts to retrieve the comment tag from various Mutagen sources."""
+    if mutagen_tags is None:
+        return None
+
+    # Try 'comment' key directly (mutagen.File(easy=True) maps this)
+    comment_val = mutagen_tags.get('comment')
+    if comment_val is not None:
+        converted_val = _conv_string(comment_val)
+        if converted_val: return converted_val
+
+    # For ID3 (MP3s), check raw COMM frames.
+    if isinstance(mutagen_tags, (EasyMP3, EasyID3)):
+        if hasattr(mutagen_tags, '_id3') and hasattr(mutagen_tags._id3, 'frames'):
+            for frame_id, frame_obj in mutagen_tags._id3.frames.items():
+                if frame_id.startswith('COMM'): # 'COMM' frames store comments
+                    if hasattr(frame_obj, 'text') and frame_obj.text:
+                        # Join all text parts of a COMM frame, if multiple
+                        return _conv_string(' '.join(map(str, frame_obj.text)))
+
+    # For ASF (WMA) files, check specific common keys.
+    if isinstance(mutagen_tags, ASF):
+        if 'WM/Comments' in mutagen_tags:
+            return _conv_string(mutagen_tags['WM/Comments'])
+        if 'Description' in mutagen_tags:
+            return _conv_string(mutagen_tags['Description'])
+
+    # For MP4 files, check specific common keys.
+    if isinstance(mutagen_tags, MP4):
+        if '\xa9cmt' in mutagen_tags: # iTunes 'comment' tag
+            return _conv_string(mutagen_tags['\xa9cmt'])
+        if 'desc' in mutagen_tags: # General description field in MP4
+            return _conv_string(mutagen_tags['desc'])
+
+    return None
+
 
 # Tuples of (attribute_name, mutagen_getter_key_string, converter_function)
 TAG_EXTRACTION_RULES = [
@@ -71,7 +107,7 @@ TAG_EXTRACTION_RULES = [
     ("album", "album", _conv_string),
     ("genre", "genre", _conv_string),
     ("composer", "composer", _conv_string),
-    ("comment", "comment", _conv_string),
+    ("comment", "comment", _extract_comment_value),
     ("albumartist", "albumartist", _conv_string),
     ("grouping", "grouping", _conv_string),
     ("date", "date", _conv_string),
@@ -131,7 +167,7 @@ class MusicFile:
 
         self.grouping = self.title if self.grouping is None else self.grouping
         self.canonicalartist = self.artist if self.artist else self.albumartist
-        self.composer = self.composer if self.composer else self.artist
+        self.composer = self.composer if self.composer else '<Untagged>'
 
         self.year = None
 
@@ -214,3 +250,10 @@ class MusicFile:
         title_val = self.title if self.title is not None else "(No Title)"
         artist_val = self.artist if self.artist is not None else "(No Artist)"
         return f"MusicFile(filepath='{self.filepath}', title='{title_val}', artist='{artist_val}')"
+
+    def generate_unique_id(self) -> str:
+        """
+        Generates a unique ID for this music file based on its filepath and modification time.
+        This is used for de-duplication and tracking in the database.
+        """
+        return f"{self.filepath}_{self.modtime_unix}"

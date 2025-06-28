@@ -98,15 +98,22 @@ def main():
     # DEBUG: Check number of tag files loaded
     print(f"Number of tag files loaded: {len(main_index._loaded_tag_files)}")
     for tag_index, tag_file in main_index._loaded_tag_files.items():
-        print(tag_file)
-        if tag_index != RockboxDBFileType.COMMENT:
+        tag_file.db_file_type: RockboxDBFileType = tag_file.db_file_type
+
+        # If not a comment or title tag file, print basic info
+        if tag_file.db_file_type.tag_index not in [3, 6]:
+            print(
+                f"Tag File {tag_index} ({tag_file.db_file_type.filename}): "
+                f"Entries: {len(tag_file.entries)}, "
+                f"Magic: {hex(tag_file.magic)}, "
+                f"Data Size: {tag_file.datasize}, "
+                f"Is Filename DB: {tag_file.db_file_type.is_filename_db}"
+            )
             continue
-        # Print out all the tag entries for the COMMENT tag file
-        print(f"Tag file {tag_index} ({tag_file.db_type.name}) has {len(tag_file.entries)} entries:")
+
+        print(tag_file)
         for entry in tag_file.entries:
-            print(f"  Entry: {entry}")
-            print(f"    Seek: {entry.seek}")
-            print(f"    Data: {entry.data}")
+            print(f"  Entry {entry.idx_id}: {entry.tag_data} ")
 
     # Write the database to the output directory
     print(f"Writing Rockbox database to: {output_db_dir}")

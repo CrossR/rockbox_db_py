@@ -24,6 +24,7 @@ class TagFile:
             )
 
         self.db_file_type: RockboxDBFileType = db_file_type
+        self.duplicates_possible: bool = db_file_type.duplicates_possible
         self.magic: int = self.db_file_type.magic
 
         # Total size of entries (excluding header), calculated on write.
@@ -53,6 +54,7 @@ class TagFile:
         """
         filename: str = os.path.basename(filepath)
         db_file_type: RockboxDBFileType = RockboxDBFileType.from_filename(filename)
+        duplicates_possible: bool = db_file_type.duplicates_possible
 
         if db_file_type.tag_index is None:
             raise ValueError(f"File '{filename}' is not a tag data file.")
@@ -81,9 +83,7 @@ class TagFile:
                     f, is_filename_db=tag_file.db_file_type.is_filename_db
                 )
 
-                tag_file.entries.append(
-                    entry
-                )  # Add all entries, even string duplicates from file.
+                tag_file.add_entry(entry)
 
                 # Store entry in entries_by_offset by its original offset.
                 # This map needs to contain ALL entries read from the file.
@@ -91,8 +91,8 @@ class TagFile:
                     tag_file.entries_by_offset[entry.offset_in_file] = entry
 
                 # Store entry in entries_by_tag_data as canonical lookup.
-                # If duplicates exist, this will store the LAST one read for that string.
-                tag_file.entries_by_tag_data[entry.tag_data.casefold()] = entry
+                key = entry.key if duplicates_possible else entry.tag_data
+                tag_file.entries_by_tag_data[key] = entry
         return tag_file
 
     def to_file(self, filepath: str):
@@ -130,10 +130,11 @@ class TagFile:
                 f.write(entry_bytes)
 
                 current_offset += len(entry_bytes)
+                key = entry.key if self.duplicates_possible else entry.tag_data
 
                 # Update internal lookups with the newly assigned offset and data.
                 self.entries_by_offset[entry.offset_in_file] = entry
-                self.entries_by_tag_data[entry.tag_data.casefold()] = entry
+                self.entries_by_tag_data[key] = entry
 
     def get_entry_by_offset(self, offset: int) -> Optional[TagFileEntry]:
         """Retrieves a TagFileEntry by its byte offset in the file."""
@@ -144,7 +145,7 @@ class TagFile:
         Retrieves a TagFileEntry by its tag data string (case-insensitive).
         Returns the canonical entry (the last one loaded/written for that string) if found.
         """
-        return self.entries_by_tag_data.get(tag_data.casefold())
+        return self.entries_by_tag_data.get(tag_data)
 
     def add_entry(self, entry: TagFileEntry) -> TagFileEntry:
         """
@@ -152,20 +153,21 @@ class TagFile:
         This method is primarily used when building a database from scratch or adding
         new canonical genre strings during modification.
         """
-        entry_tag_data_casefolded: str = entry.tag_data.casefold()
+        entry_key: str = entry.tag_data
+
+        if self.duplicates_possible:
+            entry_key = entry.key
 
         # If the string content is not already in our canonical map, add this entry.
-        if entry_tag_data_casefolded not in self.entries_by_tag_data:
+        if entry_key not in self.entries_by_tag_data:
             # Add to the main list of entries (will be sorted/written).
             self.entries.append(entry)
             # Store as the canonical entry for this string.
-            self.entries_by_tag_data[entry_tag_data_casefolded] = entry
+            self.entries_by_tag_data[entry_key] = entry
             return entry
         else:
             # If the string content already exists, return the existing canonical entry.
-            existing_canonical_entry: TagFileEntry = self.entries_by_tag_data[
-                entry_tag_data_casefolded
-            ]
+            existing_canonical_entry: TagFileEntry = self.entries_by_tag_data[entry_key]
             return existing_canonical_entry
 
     def __repr__(self) -> str:
