@@ -3,14 +3,16 @@
 from multiprocessing import Pool
 import os
 import shutil
+import string
 from typing import Optional, List, Dict, Union
 
 from rockbox_db_py.classes.db_file_type import RockboxDBFileType
 from rockbox_db_py.classes.index_file import IndexFile
+from rockbox_db_py.classes.index_file_entry import IndexFileEntry
 from rockbox_db_py.classes.music_file import MusicFile, SUPPORTED_MUSIC_EXTENSIONS
 from rockbox_db_py.classes.tag_file import TagFile
 from rockbox_db_py.classes.tag_file_entry import TagFileEntry
-from rockbox_db_py.utils.defs import TagTypeEnum, FILE_TAG_INDICES
+from rockbox_db_py.utils.defs import TagTypeEnum, FILE_TAG_INDICES, TAG_COUNT
 
 from tqdm import tqdm
 
@@ -204,3 +206,106 @@ def scan_music_directory(
         print("No valid music files found or parsed successfully.")
 
     return music_files
+
+
+def build_rockbox_database_from_music_files(
+    music_files: List[MusicFile],
+    input_folder: str,
+    output_rockbox_path_prefix: str,
+) -> IndexFile:
+    """
+    Builds a complete Rockbox database (IndexFile and associated TagFiles)
+    from a list of MusicFile objects.
+
+    Args:
+        music_files: A list of MusicFile objects, representing the music library.
+        input_folder: The base path where music files are located on the filesystem.
+        output_rockbox_path_prefix: The base path where music files will reside
+                                    on the Rockbox device (e.g., "/Music/").
+
+    Returns:
+        A new IndexFile object fully populated with all necessary data.
+    """
+
+    main_index: IndexFile = IndexFile()
+
+    # Initialize all TagFile objects (one for each file-based tag type).
+    for db_type in RockboxDBFileType:
+        if db_type == RockboxDBFileType.INDEX or db_type.tag_index is None:
+            continue
+        tag_file: TagFile = TagFile(db_type)
+        main_index._loaded_tag_files[db_type.tag_index] = tag_file
+
+    # Process each MusicFile to create IndexFileEntry and populate TagFiles.
+    for music_file in tqdm(music_files, desc="Processing music files into DB"):
+        new_index_entry: IndexFileEntry = IndexFileEntry(tag_seek=[0] * TAG_COUNT)
+
+        # Populate embedded numeric tags directly from MusicFile.
+        new_index_entry.tag_seek[TagTypeEnum.year.value] = (
+            music_file.year if music_file.year is not None else 0
+        )
+        new_index_entry.tag_seek[TagTypeEnum.discnumber.value] = (
+            music_file.discnumber if music_file.discnumber is not None else 0
+        )
+        new_index_entry.tag_seek[TagTypeEnum.tracknumber.value] = (
+            music_file.tracknumber if music_file.tracknumber is not None else 0
+        )
+        new_index_entry.tag_seek[TagTypeEnum.bitrate.value] = (
+            music_file.bitrate if music_file.bitrate is not None else 0
+        )
+        new_index_entry.tag_seek[TagTypeEnum.length.value] = (
+            music_file.length if music_file.length is not None else 0
+        )
+        new_index_entry.tag_seek[TagTypeEnum.mtime.value] = (
+            music_file.modtime_fat32 if music_file.modtime_fat32 is not None else 0
+        )
+        # Other numeric fields (playcount, rating, playtime, lastplayed, commitid, lastelapsed, lastoffset)
+        # will default to 0, which is acceptable for a new database.
+
+        # Populate file-based string tags.
+        for tag_idx in FILE_TAG_INDICES:
+            tag_name_str: str = TagTypeEnum(tag_idx).name
+
+            processed_tag_value: Optional[str] = None
+
+            # Special handling for filename tag (convert PC path to Rockbox relative path).
+            if tag_name_str == "filename":
+                # First, remove the input folder prefix from the file path.
+                relative_path: str = os.path.relpath(
+                    music_file.filepath, start=input_folder
+                )
+
+                # Then, convert to Rockbox path format (replace backslashes with forward slashes).
+                rockbox_relative_path: str = relative_path.replace("\\", "/")
+
+                # Finally, prepend the Rockbox output path prefix.
+                processed_tag_value = os.path.join(
+                    output_rockbox_path_prefix, rockbox_relative_path
+                )
+
+            # General handling for other string tags.
+            else:
+                tag_value_from_music_file: Optional[str] = getattr(music_file, tag_name_str)
+                if tag_value_from_music_file is not None:
+                    processed_tag_value = tag_value_from_music_file
+                else:
+                    processed_tag_value = None
+
+            # Add processed tag value to the corresponding TagFile.
+            if processed_tag_value is not None:
+                tag_file_for_this_tag: TagFile = main_index._loaded_tag_files[tag_idx]
+                target_tag_entry: TagFileEntry = tag_file_for_this_tag.add_entry(
+                    TagFileEntry(
+                        tag_data=processed_tag_value,
+                        is_filename_db=tag_file_for_this_tag.db_file_type
+                        == RockboxDBFileType.FILENAME,
+                    )
+                )
+                new_index_entry.tag_seek[tag_idx] = target_tag_entry
+            else:
+                new_index_entry.tag_seek[tag_idx] = 0xFFFFFFFF
+
+        # Add the constructed IndexFileEntry to the main_index.
+        main_index.add_entry(new_index_entry)
+
+    return main_index
