@@ -17,14 +17,13 @@
 
 
 import argparse
-import os
-import multiprocessing
 
 from rockbox_db_py.utils.helpers import (
-    load_rockbox_database,
     write_rockbox_database,
     scan_music_directory,
+    build_rockbox_database_from_music_files,
 )
+from rockbox_db_py.classes.db_file_type import RockboxDBFileType
 
 
 def parse_args():
@@ -87,23 +86,35 @@ def main():
 
     print(f"Found {len(music_files)} music files to index.")
 
-    # Debug print the first 10 music files
-    print("First 10 music files:")
-    for i, music_file in enumerate(music_files[:10]):
-        print(f"{i + 1}: {music_file.filepath}")
-        print(f"    Track: {music_file.tracknumber or 'No Track Number'}")
-        print(f"    Album: {music_file.album or 'No Album'}")
-        print(f"    Artist: {music_file.artist or 'No Artist'}")
-        print(f"    Track: {music_file.tracknumber or 'No Track Number'}")
-        print(f"    Genre: {music_file.genre or 'No Genre'}")
-        print(f"    Year: {music_file.year or 'Unknown'}")
-        print(f"    Length: {music_file.length} seconds")
-        print(f"    Bitrate: {music_file.bitrate} bps")
+    # Build the Rockbox database in memory
+    print("Building Rockbox database in memory...")
+    main_index = build_rockbox_database_from_music_files(
+        music_files,
+        input_folder=input_music_dir,
+        output_rockbox_path_prefix=args.output_rockbox_path,
+    )
+    print("Rockbox database built in memory.")
 
+    # DEBUG: Check number of tag files loaded
+    print(f"Number of tag files loaded: {len(main_index._loaded_tag_files)}")
+    for tag_index, tag_file in main_index._loaded_tag_files.items():
+        print(tag_file)
+        if tag_index != RockboxDBFileType.COMMENT:
+            continue
+        # Print out all the tag entries for the COMMENT tag file
+        print(f"Tag file {tag_index} ({tag_file.db_type.name}) has {len(tag_file.entries)} entries:")
+        for entry in tag_file.entries:
+            print(f"  Entry: {entry}")
+            print(f"    Seek: {entry.seek}")
+            print(f"    Data: {entry.data}")
+
+    # Write the database to the output directory
+    print(f"Writing Rockbox database to: {output_db_dir}")
+    write_rockbox_database(main_index, output_db_dir)
+    print("Rockbox database written successfully.")
 
     print("Finished!")
 
 
 if __name__ == "__main__":
-    multiprocessing.freeze_support()
     main()

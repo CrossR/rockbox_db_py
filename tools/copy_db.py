@@ -216,6 +216,43 @@ def compare_parsed_dbs(original_db: IndexFile, written_db: IndexFile):
                         f"        ❌ Prop '{prop}': Original={orig_prop_val} | Written={written_prop_val}"
                     )
                     tag_file_match = False
+                else:
+                    print(
+                        f"        ✅ Prop '{prop}': {orig_prop_val} (matches written)"
+                    )
+
+            # Get all the entries for this tag file
+            orig_entires = orig_tag_file.entries
+            written_entries = written_tag_file.entries
+
+            # Get the overlap and unique entries for each
+            orig_entrys = {entry.tag_data for entry in orig_entires}
+            written_entrys = {entry.tag_data for entry in written_entries}
+            common_entrys = orig_entrys.intersection(written_entrys)
+            orig_uniques = orig_entrys - common_entrys
+            written_uniques = written_entrys - common_entrys
+
+            if len(orig_uniques) == 0 and len(written_uniques) == 0:
+                print(f"        ✅ No unique entries in either tag file: {len(common_entrys)}")
+            else:
+                print(
+                    f"        ❌ Unique entries found: Original={len(orig_uniques)} | Written={len(written_uniques)}"
+                )
+
+            if len(orig_uniques) > 0:
+                print(
+                    f"        ❌ Original tag file '{tag_filename}' has {len(orig_uniques)} unique entries:"
+                )
+                tag_file_match = False
+                for entry in orig_uniques:
+                    print(f"          - Unique Original Entry: {entry}")
+            if len(written_uniques) > 0:
+                print(
+                    f"        ❌ Written tag file '{tag_filename}' has {len(written_uniques)} unique entries:"
+                )
+                tag_file_match = False
+                for entry in written_uniques:
+                    print(f"          - Unique Written Entry: {entry}")
 
             # Optionally, compare the entries within the TagFile objects
             if len(orig_tag_file.entries) != len(written_tag_file.entries):
@@ -280,7 +317,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    load_and_write_rockbox_database(args.input_db_dir, args.output_db_dir)
+    # load_and_write_rockbox_database(args.input_db_dir, args.output_db_dir)
 
     if args.compare:
         success = compare_files(args.input_db_dir, args.output_db_dir)

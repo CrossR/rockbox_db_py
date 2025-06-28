@@ -152,9 +152,8 @@ def debug_database_integrity(main_index: IndexFile):
                 print(f"      Filename: '{entry.filename}'")
                 print(f"      Title: '{entry.title}'")
                 print(f"      Album: '{entry.album}'")
-                print(
-                    f"      Year: '{entry.year}'"
-                )  # Check an embedded numeric tag (like Year)
+                print(f"      Year: '{entry.year}'")
+                print(f"      Composer: '{entry.composer}'")
 
                 # Basic validation: Check if essential tags are present after copy
                 if entry.filename is None or entry.title is None:
