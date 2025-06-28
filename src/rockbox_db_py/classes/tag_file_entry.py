@@ -4,6 +4,7 @@ import struct
 import math
 from typing import Optional
 
+from rockbox_db_py.classes.db_file_type import RockboxDBFileType
 from rockbox_db_py.utils.defs import ENCODING, TAGFILE_ENTRY_CHUNK_LENGTH
 from rockbox_db_py.utils.struct_helpers import ENDIANNESS_CHAR
 from rockbox_db_py.utils.struct_helpers import read_uint32
@@ -20,14 +21,17 @@ class TagFileEntry:
         self,
         tag_data: str = "",
         idx_id: int = 0xFFFFFFFF,
-        is_filename_db: bool = False,
         offset_in_file: Optional[int] = None,
         unique_id: Optional[str] = None,
+        db_file_type: Optional[RockboxDBFileType] = None,
     ):
         self.tag_data = tag_data
         self.idx_id = idx_id
-        self.is_filename_db = is_filename_db
         self.offset_in_file = offset_in_file
+        self.db_file_type = db_file_type
+        self.is_filename_db = (
+            True if db_file_type and db_file_type.is_filename_db else False
+        )
 
         # A unique ID, used for de-duplication and tracking.
         self.unique_id = unique_id
@@ -43,13 +47,15 @@ class TagFileEntry:
         return self.tag_data
 
     @classmethod
-    def from_file(cls, f, is_filename_db: bool = False):
+    def from_file(
+        cls, f, db_file_type: Optional[RockboxDBFileType] = None
+    ) -> "TagFileEntry":
         """
         Reads a TagFileEntry from a file object.
 
         Args:
             f: File object, positioned at the start of an entry.
-            is_filename_db: True if reading from the filename database (database_4.tcd),
+            db_file_type: Optional RockboxDBFileType instance, which indicates if this is a filename database,
                             which dictates unique padding rules.
 
         Returns:
@@ -69,17 +75,49 @@ class TagFileEntry:
                 f"Not enough bytes to read tag data. Expected {tag_length}, got {len(raw_tag_data)}"
             )
 
-        # Decode the string, which is UTF-8 encoded and null-terminated.
+        decoded_tag_data: str
         null_byte_pos: int = raw_tag_data.find(b"\x00")
+        is_comment_db: bool = db_file_type == RockboxDBFileType.COMMENT
+
         if null_byte_pos != -1:
-            decoded_tag_data: str = raw_tag_data[:null_byte_pos].decode(ENCODING)
+            # If it's a comment DB and the null-terminated part is 40 bytes, try binary unpack
+            if is_comment_db and null_byte_pos == 40:
+                try:
+                    # Attempt to unpack as 10 unsigned 32-bit integers (little-endian assumed)
+                    ints = struct.unpack("<10I", raw_tag_data[:null_byte_pos])
+                    decoded_tag_data = " ".join(
+                        f"{i:08X}" for i in ints
+                    )  # Format as "00000EDA 00000B79 ..."
+                except struct.error:
+                    # Fallback if unpacking fails, just hex representation
+                    decoded_tag_data = "".join(
+                        f"{b:02X}" for b in raw_tag_data[:null_byte_pos]
+                    )
+            else:
+                # Standard UTF-8 decode for other tags or non-matching comment patterns
+                try:
+                    decoded_tag_data = raw_tag_data[:null_byte_pos].decode(ENCODING)
+                except UnicodeDecodeError:
+                    # Fallback for non-UTF-8 data with null terminator.
+                    decoded_tag_data = "".join(
+                        f"{b:02X}" for b in raw_tag_data[:null_byte_pos]
+                    )
         else:
-            decoded_tag_data = raw_tag_data.decode(ENCODING, errors="ignore")
+            # If no null byte, and it's a comment DB and raw data is 40 bytes, try binary unpack
+            if is_comment_db and len(raw_tag_data) == 40:
+                try:
+                    ints = struct.unpack("<10I", raw_tag_data)
+                    decoded_tag_data = " ".join(f"{i:08X}" for i in ints)
+                except struct.error:
+                    decoded_tag_data = "".join(f"{b:02X}" for b in raw_tag_data)
+            else:
+                # Fallback for other non-null-terminated data, represent as hex string
+                decoded_tag_data = "".join(f"{b:02X}" for b in raw_tag_data)
 
         return cls(
             tag_data=decoded_tag_data,
             idx_id=idx_id,
-            is_filename_db=is_filename_db,
+            db_file_type=db_file_type,
             offset_in_file=initial_offset,
         )
 
@@ -95,7 +133,10 @@ class TagFileEntry:
         if self.is_filename_db:
             padded_length: int = len(data_with_null)
         else:
-            padded_length = int(math.ceil(len(data_with_null) / TAGFILE_ENTRY_CHUNK_LENGTH)) * TAGFILE_ENTRY_CHUNK_LENGTH
+            padded_length = (
+                int(math.ceil(len(data_with_null) / TAGFILE_ENTRY_CHUNK_LENGTH))
+                * TAGFILE_ENTRY_CHUNK_LENGTH
+            )
 
         # Pad with 'X' bytes as seen in tagcache.c for unused space.
         padded_data: bytes = data_with_null.ljust(padded_length, b"X")

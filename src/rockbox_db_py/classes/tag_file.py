@@ -80,7 +80,7 @@ class TagFile:
             # Deduplication for functional purposes will happen in `add_entry` or during processing.
             for _ in range(tag_file.entry_count):
                 entry: TagFileEntry = TagFileEntry.from_file(
-                    f, is_filename_db=tag_file.db_file_type.is_filename_db
+                    f, db_file_type=db_file_type
                 )
 
                 tag_file.add_entry(entry)
