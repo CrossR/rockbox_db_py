@@ -57,9 +57,13 @@ def _conv_int(value: Any) -> Optional[int]:
     try:
         if isinstance(value, (list, tuple)):
             value = value[0] if value else None
-        return int(value) if value is not None else None
+        return int(value)
     except (ValueError, TypeError):
         return None
+
+def _conv_float(value: Any) -> Optional[float]:
+    """Converts a value to a single float."""
+    return float(value) if value is not None else None
 
 def _extract_comment_value(mutagen_tags: mutagen.File) -> Optional[str]:
     """Robustly attempts to retrieve the comment tag from various Mutagen sources."""
@@ -100,7 +104,7 @@ def _extract_comment_value(mutagen_tags: mutagen.File) -> Optional[str]:
 
 # Tuples of (attribute_name, mutagen_getter_key_string, converter_function)
 TAG_EXTRACTION_RULES = [
-    ("length", "info.length", _conv_int),  # mutagen.File.info.length attribute
+    ("length", "info.length", _conv_float),  # mutagen.File.info.length attribute
     ("bitrate", "info.bitrate", _conv_int),  # mutagen.File.info.bitrate attribute
     ("title", "title", _conv_string),
     ("artist", "artist", _conv_string),
@@ -140,7 +144,7 @@ class MusicFile:
         discnumber: Optional[int] = None,
         tracknumber: Optional[int] = None,
         bitrate: Optional[int] = None,
-        length: Optional[int] = None,
+        length: Optional[float] = None,
     ):
         self.filepath: str = filepath
         self.filesize: int = filesize
@@ -159,7 +163,13 @@ class MusicFile:
         self.discnumber: Optional[int] = discnumber
         self.tracknumber: Optional[int] = tracknumber
         self.bitrate: Optional[int] = bitrate
-        self.length: Optional[int] = length
+
+        # Convert length from seconds to milliseconds if provided
+        if length is not None and isinstance(length, (int, float)):
+            self.length: Optional[int] = int(length * 1000.0)
+            self.raw = length
+        else:
+            self.length: Optional[int] = None
 
         # Get some useful derived properties
         self.filename: str = os.path.basename(filepath)
