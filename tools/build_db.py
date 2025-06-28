@@ -19,10 +19,12 @@
 import argparse
 
 from rockbox_db_py.utils.helpers import (
+    load_rockbox_database,
     write_rockbox_database,
     scan_music_directory,
     build_rockbox_database_from_music_files,
 )
+from rockbox_db_py.utils.defs import TagTypeEnum
 
 
 def parse_args():
@@ -84,6 +86,45 @@ def main():
         return
 
     print(f"Found {len(music_files)} music files to index.")
+
+    # DEBUG: Load the existing database files
+    existing_path = "D:\\User Files\\Downloads\\rockbox\\clean"
+    existing_db = load_rockbox_database(existing_path)
+
+    old_song_entries = [e._loaded_tag_files[TagTypeEnum.filename.value] for e in existing_db.entries][0]
+    print(f"Loaded existing database with {len(existing_db.entries)} entries.")
+    old_song_paths = [e.tag_data for e in old_song_entries.entries]
+    print(f"Found {len(old_song_paths)} existing song paths in the database.")
+    print("First 10 existing song paths:")
+    for path in old_song_paths[:10]:
+        print(f"  {path}")
+
+    # Use the existing database to sort the music files
+    old_to_index_map = {
+        old_song_paths[i]: i for i in range(len(old_song_paths))
+    }
+    new_to_old_filepath_map = {
+        mf.filepath: mf.filepath.replace(input_music_dir, "/Music/").replace("\\", "/")
+        for mf in music_files
+    }
+
+    print(f"First 10 new music file paths:")
+    for mf in music_files[:10]:
+        print(f"  {mf.filepath}")
+
+    print("Mapping new music files to old file paths...")
+    music_files.sort(
+        key=lambda mf: old_to_index_map.get(
+            new_to_old_filepath_map.get(mf.filepath, ""),
+            len(old_song_paths) + 1,  # If not found, place at the end
+        )
+        if new_to_old_filepath_map.get(mf.filepath, "") in old_to_index_map
+        else len(old_song_paths)
+    )
+
+    print("Post-sorting music files based on existing database...")
+    for mf in music_files[:10]:
+        print(f"  {mf.filepath}, {mf.length}, {mf.raw}")
 
     # Build the Rockbox database in memory
     print("Building Rockbox database in memory...")
