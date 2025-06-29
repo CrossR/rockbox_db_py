@@ -1,105 +1,46 @@
 # src/rockbox_db_py/classes/music_file.py
 
 from datetime import datetime
+from dataclasses import dataclass
 import os
 from typing import Optional, List, Dict, Any
 
-import mutagen
-from mutagen.asf import ASF
-from mutagen.apev2 import APEv2File as APE
-from mutagen.flac import FLAC
-from mutagen.easyid3 import EasyID3FileType as ID3
-from mutagen.mp3 import EasyMP3 as MP3
-from mutagen.oggvorbis import OggVorbis as Vorbis
-from mutagen.wavpack import WavPack
-from mutagen.mp4 import MP4
-from mutagen.musepack import Musepack
-
 from rockbox_db_py.utils.utils import mtime_to_fat
+
+from mediafile import MediaFile, TYPES
 
 
 # Define supported formats for mutagen.File.
 # These are passed to mutagen.File to help it identify file types.
-SUPPORTED_MUTAGEN_FORMATS = [ASF, APE, FLAC, ID3, MP3, Vorbis, WavPack, MP4, Musepack]
+SUPPORTED_MUTAGEN_FORMATS = [format for format in TYPES.values()]
 
 # Commonly used extensions for the above formats.
-SUPPORTED_MUSIC_EXTENSIONS: List[str] = [
-    ".mp3",
-    ".flac",
-    ".ogg",
-    ".wav",
-    ".ape",
-    ".wv",
-    ".m4a",
-    ".mp4",
-    ".musepack",
-    ".mpc",
-]
+SUPPORTED_MUSIC_EXTENSIONS: List[str] = [f".{ext}" for ext in TYPES.keys()]
 
 
-# Converter functions for extracting and converting tag values
-# These functions handle converting mutagen tag values to the appropriate Python types.
-# This is necessary as without it...something angers multiprocessing + the pickling that
-# happens when passing MusicFile objects between processes.
-def _conv_string(value: Any) -> Optional[str]:
-    """Converts a value to a single string, taking the first item if it's a list."""
-    if value is None:
-        return None
-    if isinstance(value, (list, tuple)):
-        return str(value[0]) if value else None
-    return str(value)
+@dataclass
+class TagType:
+    rockbox_name: str
+    mediafile_names: List[str]
+    type: str
 
 
-def _conv_int(value: Any) -> Optional[int]:
-    """Converts a value to a single integer."""
-    if value is None:
-        return None
-    try:
-        if isinstance(value, (list, tuple)):
-            value = value[0] if value else None
-        return int(value)
-    except (ValueError, TypeError):
-        return None
-
-
-def _conv_float(value: Any) -> Optional[float]:
-    """Converts a value to a single float."""
-    return float(value) if value is not None else None
-
-
-def _conv_track_or_disc(value: Any) -> Optional[int]:
-    """
-    Converts a track or disc string value to an integer.
-    I.e. 10/12 -> 10, 1/2 -> 1, etc.
-    """
-    value_str = _conv_string(value)
-
-    if value_str is None:
-        return None
-
-    # Split by '/' and take the first part
-    parts = value_str.split("/")
-    if parts:
-        try:
-            return int(parts[0].strip())  # Convert the first part to an integer
-        except ValueError:
-            return None
-
-
-# Tuples of (attribute_name, mutagen_getter_key_string, converter_function)
-TAG_EXTRACTION_RULES = [
-    ("length", "info.length", _conv_float),  # mutagen.File.info.length attribute
-    ("bitrate", "info.bitrate", _conv_int),  # mutagen.File.info.bitrate attribute
-    ("title", "title", _conv_string),
-    ("artist", "artist", _conv_string),
-    ("album", "album", _conv_string),
-    ("genre", "genre", _conv_string),
-    ("composer", "composer", _conv_string),
-    ("albumartist", "albumartist", _conv_string),
-    ("grouping", "grouping", _conv_string),
-    ("date", "date", _conv_string),
-    ("discnumber", "discnumber", _conv_track_or_disc),
-    ("tracknumber", "tracknumber", _conv_track_or_disc),
+# Define the mapping of Rockbox tags to MediaFile attributes.
+# If there is multiple options for a tag, use a list.
+ROCKBOX_TO_MEDIAFILE = [
+    TagType("artist", ["artist", "performer"], "str"),
+    TagType("album", ["album"], "str"),
+    TagType("genre", ["genre"], "str"),
+    TagType("title", ["title"], "str"),
+    TagType("composer", ["composer"], "str"),
+    TagType("comment", ["comments"], "str"),
+    TagType("albumartist", ["albumartist"], "str"),
+    TagType("grouping", ["grouping", "title"], "str"),
+    TagType("date", ["date", "year"], "str"),
+    TagType("discnumber", ["disc"], "int"),
+    TagType("tracknumber", ["track"], "int"),
+    TagType("bitrate", ["bitrate"], "int"),
+    TagType("length", ["length"], "float"),
 ]
 
 
@@ -183,52 +124,47 @@ class MusicFile:
             filesize: int = stat_info.st_size
             modtime_unix: int = int(stat_info.st_mtime)
 
-            mutagen_tags: Optional[mutagen.File] = mutagen.File(path, easy=True)
-            mutagen_tags_all: Optional[mutagen.File] = mutagen.File(path).tags
+            media_file: MediaFile = MediaFile(path)
 
-            if mutagen_tags is None:
+            if media_file is None:
                 print(f"Unsupported file format or no tags found for: {path}")
                 return None
 
             extracted_tags: Dict[str, Any] = {}
-            for attr_name, mutagen_key_str, converter_func in TAG_EXTRACTION_RULES:
-                try:
-                    # Handle attributes directly from mutagen_tags.info (e.g., 'info.length')
-                    if "." in mutagen_key_str:
-                        obj_name, attr_name_in_obj = mutagen_key_str.split(".")
-                        raw_value = getattr(mutagen_tags, obj_name, None)
-                        if raw_value is not None:
-                            raw_value = getattr(raw_value, attr_name_in_obj, None)
+            for tag_props in ROCKBOX_TO_MEDIAFILE:
 
-                    else:
-                        raw_value = mutagen_tags.get(mutagen_key_str)
+                rockbox_name = tag_props.rockbox_name
+                mediafile_tags = tag_props.mediafile_names
+                tag_type = tag_props.type
 
-                    extracted_tags[attr_name] = converter_func(raw_value)
-                except (AttributeError, KeyError, ValueError, IndexError) as e:
-                    extracted_tags[attr_name] = None
+                # Use getattr to get the tag value, defaulting to None if not present
+                for mediafile_tag in mediafile_tags:
+                    tag_value = getattr(media_file, mediafile_tag, None)
+                    if tag_value is not None:
+                        break
 
+                # If no tag value was found, set it to None
+                if tag_value is None:
+                    tag_value = None
+
+                # Convert the tag value to the appropriate type
+                if tag_type == "str":
+                    extracted_tags[rockbox_name] = str(tag_value) if tag_value else None
+                elif tag_type == "int":
+                    extracted_tags[rockbox_name] = int(tag_value) if tag_value else None
+                elif tag_type == "float":
+                    extracted_tags[rockbox_name] = (
+                        float(tag_value) if tag_value else None
+                    )
+                else:
+                    extracted_tags[rockbox_name] = tag_value
+
+            # If the comment tag is not found, set a default value.
+            # TODO: How on earth does RockBox generate this? It seems to be vary, but no idea.
             if extracted_tags.get("comment") is None:
-                # If no comment tag found, try to extract from COMM tags
-                # 'XXX' is the default language for comments in mutagen
-                for comment in mutagen_tags_all.getall("COMM") or []:
-                    if (
-                        comment.lang == "XXX"
-                    ):  # 'XXX' is the default language for comments in mutagen
-                        comment_str = str(comment.text[0])
-
-                        # If the comment is empty, skip it
-                        if comment_str:
-                            # Cut it down to 255 characters if it's too long
-                            if len(comment_str) < 50:
-                                comment_str = comment_str[:255]
-                            else:
-                                comment_str = None
-                            extracted_tags["comment"] = comment_str
-                            break
-
-            # Check again, if comment is still None, set it to an empty string
-            if extracted_tags.get("comment") is None:
-                extracted_tags["comment"] = " 0000167A 0000167A 00003832 00003832 00000000 00000000 00008608 00008608 00000000 00000000"
+                extracted_tags["comment"] = (
+                    " 0000167A 0000167A 00003832 00003832 00000000 00000000 00008608 00008608 00000000 00000000"
+                )
 
             # Create MusicFile instance, passing extracted tags as keyword arguments
             return cls(
@@ -243,6 +179,33 @@ class MusicFile:
         except Exception as e:
             print(f"Error processing file '{path}': {e}")
             return None
+
+    def info(self) -> str:
+        """
+        Returns a string with basic information about the music file.
+        This is useful for debugging and logging.
+        """
+        return "\n".join([
+            f"MusicFile Info:",
+            f"  Filepath: {self.filepath}",
+            f"  Filesize: {self.filesize} bytes",
+            f"  Modification Time (Unix): {self.modtime_unix}",
+            f"  Modification Time (FAT32): {self.modtime_fat32}",
+            f"  Title: {self.title if self.title else '(No Title)'}",
+            f"  Artist: {self.artist if self.artist else '(No Artist)'}",
+            f"  Album: {self.album if self.album else '(No Album)'}",
+            f"  Genre: {self.genre if self.genre else '(No Genre)'}",
+            f"  Composer: {self.composer if self.composer else '(No Composer)'}",
+            f"  Comment: {self.comment if self.comment else '(No Comment)'}",
+            f"  Album Artist: {self.albumartist if self.albumartist else '(No Album Artist)'}",
+            f"  Grouping: {self.grouping if self.grouping else '(No Grouping)'}",
+            f"  Date: {self.date if self.date else '(No Date)'}",
+            f"  Disc Number: {self.discnumber if self.discnumber is not None else '(No Disc Number)'}",
+            f"  Track Number: {self.tracknumber if self.tracknumber is not None else '(No Track Number)'}",
+            f"  Bitrate: {self.bitrate if self.bitrate is not None else '(No Bitrate)'} kbps",
+            f"  Length: {self.length if self.length is not None else '(No Length)'} ms",
+        ])
+
 
     def __repr__(self) -> str:
         """Provides a developer-friendly string representation."""
