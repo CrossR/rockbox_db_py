@@ -89,8 +89,10 @@ def finalize_index_for_write(main_index: IndexFile):
 
 
 def write_rockbox_database(
-    main_index: IndexFile, output_db_dir: str, auto_finalize: bool = True,
-    sort_map: Optional[Dict[TagTypeEnum, Dict[str, str]]] = None
+    main_index: IndexFile,
+    output_db_dir: str,
+    auto_finalize: bool = True,
+    sort_map: Optional[Dict[TagTypeEnum, Dict[str, str]]] = None,
 ) -> bool:
     """
     Saves the modified Rockbox database (IndexFile and its associated TagFiles)
@@ -137,7 +139,7 @@ def write_rockbox_database(
 
             # If a sort_map is provided for this TagFile, get it.
             if sort_map and tag_file_obj in sort_map:
-                tag_file_sort_map  = sort_map[tag_file_obj]
+                tag_file_sort_map = sort_map[tag_file_obj]
             else:
                 tag_file_sort_map = None
 

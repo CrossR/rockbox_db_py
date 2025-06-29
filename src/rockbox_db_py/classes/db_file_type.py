@@ -3,6 +3,7 @@ from enum import Enum
 
 from rockbox_db_py.utils.defs import TAG_MAGIC
 
+
 class RockboxDBFileType(Enum):
     """
     Enum for different Rockbox database file types, with associated properties.
@@ -14,6 +15,7 @@ class RockboxDBFileType(Enum):
     - `duplicates_possible`: Whether the file type allows duplicate entries.
 
     """
+
     # Main index file
     INDEX = {
         "filename": "database_idx.tcd",
@@ -87,7 +89,7 @@ class RockboxDBFileType(Enum):
     def __new__(cls, props_dict):
         obj = object.__new__(cls)
         obj._value_ = props_dict
-        object.__setattr__(obj, 'props', props_dict)
+        object.__setattr__(obj, "props", props_dict)
 
         return obj
 
@@ -95,7 +97,9 @@ class RockboxDBFileType(Enum):
         try:
             return self.props[name]
         except KeyError as e:
-            raise AttributeError(f"'{self.name}' (RockboxDBFileType member) has no attribute '{name}'") from e
+            raise AttributeError(
+                f"'{self.name}' (RockboxDBFileType member) has no attribute '{name}'"
+            ) from e
 
     @property
     def is_filename_db(self):
@@ -116,4 +120,6 @@ class RockboxDBFileType(Enum):
         for file_type in cls:
             if file_type.tag_index == tag_index:
                 return file_type
-        raise ValueError(f"No Rockbox database file associated with tag index: {tag_index}")
+        raise ValueError(
+            f"No Rockbox database file associated with tag index: {tag_index}"
+        )

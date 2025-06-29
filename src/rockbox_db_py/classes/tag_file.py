@@ -114,9 +114,7 @@ class TagFile:
             # This allows for custom sorting based on external criteria, or simply breaking
             # ties in a consistent way.
             if sort_map:
-                self.entries.sort(
-                    key=lambda e: (sort_map.get(e.tag_data, e.tag_data))
-                )
+                self.entries.sort(key=lambda e: (sort_map.get(e.tag_data, e.tag_data)))
             else:
                 # Sort entries by tag_data (case-insensitive)
                 self.entries.sort(key=lambda e: e.tag_data.lower())

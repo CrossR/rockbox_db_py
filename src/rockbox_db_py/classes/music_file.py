@@ -172,28 +172,29 @@ class MusicFile:
         Returns a string with basic information about the music file.
         This is useful for debugging and logging.
         """
-        return "\n".join([
-            f"MusicFile Info:",
-            f"  Filepath: {self.filepath}",
-            f"  Filesize: {self.filesize} bytes",
-            f"  Modification Time (Unix): {self.modtime_unix}",
-            f"  Modification Time (FAT32): {self.modtime_fat32}",
-            f"  Title: {self.title if self.title else '(No Title)'}",
-            f"  Artist: {self.artist if self.artist else '(No Artist)'}",
-            f"  Album: {self.album if self.album else '(No Album)'}",
-            f"  Genre: {self.genre if self.genre else '(No Genre)'}",
-            f"  Composer: {self.composer if self.composer else '(No Composer)'}",
-            f"  Comment: {self.comment if self.comment else '(No Comment)'}",
-            f"  Album Artist: {self.albumartist if self.albumartist else '(No Album Artist)'}",
-            f"  Grouping: {self.grouping if self.grouping else '(No Grouping)'}",
-            f"  Date: {self.date if self.date else '(No Date)'}",
-            f"  Year: {self.year if self.year is not None else '(No Year)'}",
-            f"  Disc Number: {self.discnumber if self.discnumber is not None else '(No Disc Number)'}",
-            f"  Track Number: {self.tracknumber if self.tracknumber is not None else '(No Track Number)'}",
-            f"  Bitrate: {self.bitrate if self.bitrate is not None else '(No Bitrate)'} kbps",
-            f"  Length: {self.length if self.length is not None else '(No Length)'} ms",
-        ])
-
+        return "\n".join(
+            [
+                f"MusicFile Info:",
+                f"  Filepath: {self.filepath}",
+                f"  Filesize: {self.filesize} bytes",
+                f"  Modification Time (Unix): {self.modtime_unix}",
+                f"  Modification Time (FAT32): {self.modtime_fat32}",
+                f"  Title: {self.title if self.title else '(No Title)'}",
+                f"  Artist: {self.artist if self.artist else '(No Artist)'}",
+                f"  Album: {self.album if self.album else '(No Album)'}",
+                f"  Genre: {self.genre if self.genre else '(No Genre)'}",
+                f"  Composer: {self.composer if self.composer else '(No Composer)'}",
+                f"  Comment: {self.comment if self.comment else '(No Comment)'}",
+                f"  Album Artist: {self.albumartist if self.albumartist else '(No Album Artist)'}",
+                f"  Grouping: {self.grouping if self.grouping else '(No Grouping)'}",
+                f"  Date: {self.date if self.date else '(No Date)'}",
+                f"  Year: {self.year if self.year is not None else '(No Year)'}",
+                f"  Disc Number: {self.discnumber if self.discnumber is not None else '(No Disc Number)'}",
+                f"  Track Number: {self.tracknumber if self.tracknumber is not None else '(No Track Number)'}",
+                f"  Bitrate: {self.bitrate if self.bitrate is not None else '(No Bitrate)'} kbps",
+                f"  Length: {self.length if self.length is not None else '(No Length)'} ms",
+            ]
+        )
 
     def __repr__(self) -> str:
         """Provides a developer-friendly string representation."""

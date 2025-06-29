@@ -128,9 +128,7 @@ def compare_parsed_dbs(original_db: IndexFile, written_db: IndexFile):
 
     # 3. Compare entries themselves (up to a certain limit or all if small)
     print("\n  >> Entry-by-Entry Comparison <<")
-    compare_limit = min(
-        len(original_db.entries), len(written_db.entries), 5
-    )
+    compare_limit = min(len(original_db.entries), len(written_db.entries), 5)
     mismatch_found_in_entries = False
 
     for i in range(compare_limit):
@@ -246,7 +244,9 @@ def compare_parsed_dbs(original_db: IndexFile, written_db: IndexFile):
                 print("        ❌ No common entries found.")
 
             if len(orig_uniques) == 0 and len(written_uniques) == 0:
-                print(f"        ✅ No unique entries in either tag file: {len(common_entrys)}")
+                print(
+                    f"        ✅ No unique entries in either tag file: {len(common_entrys)}"
+                )
             else:
                 print(
                     f"        ❌ Unique entries found: Original={len(orig_uniques)} | Written={len(written_uniques)}"
