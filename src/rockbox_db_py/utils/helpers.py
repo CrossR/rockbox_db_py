@@ -89,7 +89,8 @@ def finalize_index_for_write(main_index: IndexFile):
 
 
 def write_rockbox_database(
-    main_index: IndexFile, output_db_dir: str, auto_finalize: bool = True
+    main_index: IndexFile, output_db_dir: str, auto_finalize: bool = True,
+    sort_map: Optional[Dict[TagTypeEnum, Dict[str, str]]] = None
 ) -> bool:
     """
     Saves the modified Rockbox database (IndexFile and its associated TagFiles)
@@ -100,6 +101,11 @@ def write_rockbox_database(
         output_db_dir: The directory where the database files will be written.
         auto_finalize: If True, automatically calls finalize_index_for_write
                        before writing the IndexFile.
+        sort_map: Optional mapping for sorting TagFile entries by tag data.
+                  This can be useful to ensure consistent ordering, especially
+                  in cases where duplicates are allowed. You can pass a dictionary
+                  containing a full file path as the value, allowing
+                  for deterministic sorting of entries in TagFiles.
     """
 
     # Ensure output directory exists and is ready for writing.
@@ -129,8 +135,14 @@ def write_rockbox_database(
                 output_db_dir, db_file_type.filename
             )
 
+            # If a sort_map is provided for this TagFile, get it.
+            if sort_map and tag_file_obj in sort_map:
+                tag_file_sort_map  = sort_map[tag_file_obj]
+            else:
+                tag_file_sort_map = None
+
             # This updates entry.offset_in_file for all entries
-            tag_file_obj.to_file(output_tag_filepath)
+            tag_file_obj.to_file(output_tag_filepath, sort_map=tag_file_sort_map)
 
         # After TagFiles are written and their offsets are updated,
         # finalize IndexFile entries to point to the *new* numerical offsets.

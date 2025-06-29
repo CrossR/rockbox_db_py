@@ -95,7 +95,7 @@ class TagFile:
                 tag_file.entries_by_tag_data[key] = entry
         return tag_file
 
-    def to_file(self, filepath: str):
+    def to_file(self, filepath: str, sort_map: Optional[Dict[str, str]] = None) -> None:
         """
         Writes the TagFile object to a specified file path.
         Recalculates datasize and entry_count before writing based on current entries.
@@ -110,7 +110,16 @@ class TagFile:
         # Sort entries before writing if the TagFile type expects it (e.g., genre, artist).
         # However, filename databases are not sorted by tag data.
         if self.db_file_type != RockboxDBFileType.FILENAME:
-            self.entries.sort(key=lambda e: e.tag_data.lower())
+            # If a sort_map is provided, use it to sort entries by the mapped tag data.
+            # This allows for custom sorting based on external criteria, or simply breaking
+            # ties in a consistent way.
+            if sort_map:
+                self.entries.sort(
+                    key=lambda e: (sort_map.get(e.tag_data, e.tag_data))
+                )
+            else:
+                # Sort entries by tag_data (case-insensitive)
+                self.entries.sort(key=lambda e: e.tag_data.lower())
 
         with open(filepath, "wb") as f:
             # Write TagFile header.

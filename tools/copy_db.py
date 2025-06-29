@@ -232,6 +232,16 @@ def compare_parsed_dbs(original_db: IndexFile, written_db: IndexFile):
             orig_uniques = orig_entrys - common_entrys
             written_uniques = written_entrys - common_entrys
 
+            # Print the first 5 common entries
+            if len(common_entrys) > 0:
+                print(
+                    f"        ✅ Common entries found: {len(common_entrys)} (showing first 5):"
+                )
+                for entry in list(common_entrys)[:5]:
+                    print(f"          - Common Entry: {entry}")
+            else:
+                print("        ❌ No common entries found.")
+
             if len(orig_uniques) == 0 and len(written_uniques) == 0:
                 print(f"        ✅ No unique entries in either tag file: {len(common_entrys)}")
             else:
