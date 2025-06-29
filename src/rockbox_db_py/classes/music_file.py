@@ -61,9 +61,11 @@ def _conv_int(value: Any) -> Optional[int]:
     except (ValueError, TypeError):
         return None
 
+
 def _conv_float(value: Any) -> Optional[float]:
     """Converts a value to a single float."""
     return float(value) if value is not None else None
+
 
 def _extract_comment_value(mutagen_tags: mutagen.File) -> Optional[str]:
     """Robustly attempts to retrieve the comment tag from various Mutagen sources."""
@@ -71,35 +73,55 @@ def _extract_comment_value(mutagen_tags: mutagen.File) -> Optional[str]:
         return None
 
     # Try 'comment' key directly (mutagen.File(easy=True) maps this)
-    comment_val = mutagen_tags.get('comment')
+    comment_val = mutagen_tags.get("comment")
     if comment_val is not None:
         converted_val = _conv_string(comment_val)
-        if converted_val: return converted_val
+        if converted_val:
+            return converted_val
 
     # For ID3 (MP3s), check raw COMM frames.
     if isinstance(mutagen_tags, (EasyMP3, EasyID3)):
-        if hasattr(mutagen_tags, '_id3') and hasattr(mutagen_tags._id3, 'frames'):
+        if hasattr(mutagen_tags, "_id3") and hasattr(mutagen_tags._id3, "frames"):
             for frame_id, frame_obj in mutagen_tags._id3.frames.items():
-                if frame_id.startswith('COMM'): # 'COMM' frames store comments
-                    if hasattr(frame_obj, 'text') and frame_obj.text:
+                if frame_id.startswith("COMM"):  # 'COMM' frames store comments
+                    if hasattr(frame_obj, "text") and frame_obj.text:
                         # Join all text parts of a COMM frame, if multiple
-                        return _conv_string(' '.join(map(str, frame_obj.text)))
+                        return _conv_string(" ".join(map(str, frame_obj.text)))
 
     # For ASF (WMA) files, check specific common keys.
     if isinstance(mutagen_tags, ASF):
-        if 'WM/Comments' in mutagen_tags:
-            return _conv_string(mutagen_tags['WM/Comments'])
-        if 'Description' in mutagen_tags:
-            return _conv_string(mutagen_tags['Description'])
+        if "WM/Comments" in mutagen_tags:
+            return _conv_string(mutagen_tags["WM/Comments"])
+        if "Description" in mutagen_tags:
+            return _conv_string(mutagen_tags["Description"])
 
     # For MP4 files, check specific common keys.
     if isinstance(mutagen_tags, MP4):
-        if '\xa9cmt' in mutagen_tags: # iTunes 'comment' tag
-            return _conv_string(mutagen_tags['\xa9cmt'])
-        if 'desc' in mutagen_tags: # General description field in MP4
-            return _conv_string(mutagen_tags['desc'])
+        if "\xa9cmt" in mutagen_tags:  # iTunes 'comment' tag
+            return _conv_string(mutagen_tags["\xa9cmt"])
+        if "desc" in mutagen_tags:  # General description field in MP4
+            return _conv_string(mutagen_tags["desc"])
 
     return None
+
+def _conv_track_or_disc(value: Any) -> Optional[int]:
+    """
+    Converts a track or disc string value to an integer.
+    I.e. 10/12 -> 10, 1/2 -> 1, etc.
+    """
+    value_str = _conv_string(value)
+
+    if value_str is None:
+        return None
+
+    # Split by '/' and take the first part
+    parts = value_str.split('/')
+    if parts:
+        try:
+            return int(parts[0].strip())  # Convert the first part to an integer
+        except ValueError:
+            return None
+
 
 
 # Tuples of (attribute_name, mutagen_getter_key_string, converter_function)
@@ -115,8 +137,8 @@ TAG_EXTRACTION_RULES = [
     ("albumartist", "albumartist", _conv_string),
     ("grouping", "grouping", _conv_string),
     ("date", "date", _conv_string),
-    ("discnumber", "discnumber", _conv_int),
-    ("tracknumber", "tracknumber", _conv_int),
+    ("discnumber", "discnumber", _conv_track_or_disc),
+    ("tracknumber", "tracknumber", _conv_track_or_disc),
 ]
 
 
@@ -162,14 +184,12 @@ class MusicFile:
         self.date: Optional[str] = date
         self.discnumber: Optional[int] = discnumber
         self.tracknumber: Optional[int] = tracknumber
-        self.bitrate: Optional[int] = bitrate
-
-        # Convert length from seconds to milliseconds if provided
-        if length is not None and isinstance(length, (int, float)):
-            self.length: Optional[int] = int(length * 1000.0)
-            self.raw = length
-        else:
-            self.length: Optional[int] = None
+        self.bitrate: Optional[int] = (
+            int(bitrate / 1000) if bitrate is not None else None
+        )
+        self.length: Optional[int] = (
+            int(length * 1000.0) if length is not None else None
+        )
 
         # Get some useful derived properties
         self.filename: str = os.path.basename(filepath)
@@ -177,7 +197,7 @@ class MusicFile:
 
         self.grouping = self.title if self.grouping is None else self.grouping
         self.canonicalartist = self.artist if self.artist else self.albumartist
-        self.composer = self.composer if self.composer else '<Untagged>'
+        self.composer = self.composer if self.composer else "<Untagged>"
 
         self.year = None
 
@@ -205,6 +225,8 @@ class MusicFile:
             mutagen_tags: Optional[mutagen.File] = mutagen.File(path, easy=True)
             mutagen_tags_all: Optional[mutagen.File] = mutagen.File(path).tags
 
+            print(mutagen_tags)
+
             if mutagen_tags is None:
                 print(f"Unsupported file format or no tags found for: {path}")
                 return None
@@ -229,8 +251,10 @@ class MusicFile:
             if extracted_tags.get("comment") is None:
                 # If no comment tag found, try to extract from COMM tags
                 # 'XXX' is the default language for comments in mutagen
-                for comment in (mutagen_tags_all.getall("COMM") or []):
-                    if comment.lang == "XXX":  # 'XXX' is the default language for comments in mutagen
+                for comment in mutagen_tags_all.getall("COMM") or []:
+                    if (
+                        comment.lang == "XXX"
+                    ):  # 'XXX' is the default language for comments in mutagen
                         comment_str = str(comment.text[0])
 
                         # If the comment is empty, skip it
