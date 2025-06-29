@@ -157,6 +157,9 @@ class TagFile:
 
         if self.duplicates_possible:
             entry_key = entry.key
+        else:
+            # If duplicates are not allowed, we use the tag_data directly.
+            entry_key = entry.tag_data.lower()
 
         # If the string content is not already in our canonical map, add this entry.
         if entry_key not in self.entries_by_tag_data:

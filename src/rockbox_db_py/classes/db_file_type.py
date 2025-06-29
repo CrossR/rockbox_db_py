@@ -6,73 +6,81 @@ from rockbox_db_py.utils.defs import TAG_MAGIC
 class RockboxDBFileType(Enum):
     """
     Enum for different Rockbox database file types, with associated properties.
+
+    Each member corresponds to a specific database file, with properties like:
+    - `filename`: The name of the database file.
+    - `tag_index`: The index of the tag in the database (None for the main index).
+    - `magic`: The magic number for the file type, used for validation.
+    - `duplicates_possible`: Whether the file type allows duplicate entries.
+
     """
     # Main index file
     INDEX = {
         "filename": "database_idx.tcd",
         "tag_index": None,
-        "magic": TAG_MAGIC
+        "magic": TAG_MAGIC,
+        "duplicates_possible": False,
     }
 
     ARTIST = {
         "filename": "database_0.tcd",
         "tag_index": 0,
         "magic": TAG_MAGIC,
-        "duplicates_possible": False
+        "duplicates_possible": False,
     }
     ALBUM = {
         "filename": "database_1.tcd",
         "tag_index": 1,
         "magic": TAG_MAGIC,
-        "duplicates_possible": False
+        "duplicates_possible": False,
     }
     GENRE = {
         "filename": "database_2.tcd",
         "tag_index": 2,
         "magic": TAG_MAGIC,
-        "duplicates_possible": False
+        "duplicates_possible": False,
     }
     TITLE = {
         "filename": "database_3.tcd",
         "tag_index": 3,
         "magic": TAG_MAGIC,
-        "duplicates_possible": True
+        "duplicates_possible": True,
     }
     FILENAME = {
         "filename": "database_4.tcd",
         "tag_index": 4,
         "magic": TAG_MAGIC,
-        "duplicates_possible": False
+        "duplicates_possible": False,
     }
     COMPOSER = {
         "filename": "database_5.tcd",
         "tag_index": 5,
         "magic": TAG_MAGIC,
-        "duplicates_possible": False
+        "duplicates_possible": False,
     }
     COMMENT = {
         "filename": "database_6.tcd",
         "tag_index": 6,
         "magic": TAG_MAGIC,
-        "duplicates_possible": True
+        "duplicates_possible": True,
     }
     ALBUMARTIST = {
         "filename": "database_7.tcd",
         "tag_index": 7,
         "magic": TAG_MAGIC,
-        "duplicates_possible": False
+        "duplicates_possible": False,
     }
     GROUPING = {
         "filename": "database_8.tcd",
         "tag_index": 8,
         "magic": TAG_MAGIC,
-        "duplicates_possible": True
+        "duplicates_possible": False,
     }
     CANONICALARTIST = {
         "filename": "database_12.tcd",
         "tag_index": 12,
         "magic": TAG_MAGIC,
-        "duplicates_possible": False
+        "duplicates_possible": False,
     }
 
     # Set up the enum member instances, before __init__.
