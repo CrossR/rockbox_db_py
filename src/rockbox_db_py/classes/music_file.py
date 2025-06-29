@@ -37,6 +37,7 @@ ROCKBOX_TO_MEDIAFILE = [
     TagType("albumartist", ["albumartist"], "str"),
     TagType("grouping", ["grouping", "title"], "str"),
     TagType("date", ["date", "year"], "str"),
+    TagType("year", ["year"], "int"),
     TagType("discnumber", ["disc"], "int"),
     TagType("tracknumber", ["track"], "int"),
     TagType("bitrate", ["bitrate"], "int"),
@@ -65,6 +66,7 @@ class MusicFile:
         albumartist: Optional[str] = None,
         grouping: Optional[str] = None,
         date: Optional[str] = None,
+        year: Optional[int] = None,
         discnumber: Optional[int] = None,
         tracknumber: Optional[int] = None,
         bitrate: Optional[int] = None,
@@ -84,6 +86,7 @@ class MusicFile:
         self.albumartist: Optional[str] = albumartist
         self.grouping: Optional[str] = grouping
         self.date: Optional[str] = date
+        self.year: Optional[int] = year
         self.discnumber: Optional[int] = discnumber
         self.tracknumber: Optional[int] = tracknumber
         self.bitrate: Optional[int] = (
@@ -100,18 +103,6 @@ class MusicFile:
         self.grouping = self.title if self.grouping is None else self.grouping
         self.canonicalartist = self.artist if self.artist else self.albumartist
         self.composer = self.composer if self.composer else "<Untagged>"
-
-        self.year = None
-
-        # Attempt to extract year from date if available
-        if self.date:
-            try:
-                # Try to parse date as YYYY-MM-DD or similar formats
-                parsed_date = datetime.strptime(self.date, "%Y-%m-%d")
-                self.year = parsed_date.year
-            except ValueError:
-                # If parsing fails, just convert the str to an int
-                self.year = int(self.date) if self.date.isdigit() else None
 
     @classmethod
     def from_filepath(cls, path: str) -> Optional["MusicFile"]:
@@ -142,10 +133,6 @@ class MusicFile:
                     tag_value = getattr(media_file, mediafile_tag, None)
                     if tag_value is not None:
                         break
-
-                # If no tag value was found, set it to None
-                if tag_value is None:
-                    tag_value = None
 
                 # Convert the tag value to the appropriate type
                 if tag_type == "str":
@@ -200,6 +187,7 @@ class MusicFile:
             f"  Album Artist: {self.albumartist if self.albumartist else '(No Album Artist)'}",
             f"  Grouping: {self.grouping if self.grouping else '(No Grouping)'}",
             f"  Date: {self.date if self.date else '(No Date)'}",
+            f"  Year: {self.year if self.year is not None else '(No Year)'}",
             f"  Disc Number: {self.discnumber if self.discnumber is not None else '(No Disc Number)'}",
             f"  Track Number: {self.tracknumber if self.tracknumber is not None else '(No Track Number)'}",
             f"  Bitrate: {self.bitrate if self.bitrate is not None else '(No Bitrate)'} kbps",

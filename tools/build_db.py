@@ -97,6 +97,9 @@ def main():
 
     print(f"Found {len(music_files)} music files to index.")
 
+    print("Example music file:")
+    print(music_files[0].info())
+
     # Build the Rockbox database in memory
     print("Building Rockbox database in memory...")
     main_index = build_rockbox_database_from_music_files(
