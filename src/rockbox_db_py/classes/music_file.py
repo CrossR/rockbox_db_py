@@ -67,43 +67,6 @@ def _conv_float(value: Any) -> Optional[float]:
     return float(value) if value is not None else None
 
 
-def _extract_comment_value(mutagen_tags: mutagen.File) -> Optional[str]:
-    """Robustly attempts to retrieve the comment tag from various Mutagen sources."""
-    if mutagen_tags is None:
-        return None
-
-    # Try 'comment' key directly (mutagen.File(easy=True) maps this)
-    comment_val = mutagen_tags.get("comment")
-    if comment_val is not None:
-        converted_val = _conv_string(comment_val)
-        if converted_val:
-            return converted_val
-
-    # For ID3 (MP3s), check raw COMM frames.
-    if isinstance(mutagen_tags, (EasyMP3, EasyID3)):
-        if hasattr(mutagen_tags, "_id3") and hasattr(mutagen_tags._id3, "frames"):
-            for frame_id, frame_obj in mutagen_tags._id3.frames.items():
-                if frame_id.startswith("COMM"):  # 'COMM' frames store comments
-                    if hasattr(frame_obj, "text") and frame_obj.text:
-                        # Join all text parts of a COMM frame, if multiple
-                        return _conv_string(" ".join(map(str, frame_obj.text)))
-
-    # For ASF (WMA) files, check specific common keys.
-    if isinstance(mutagen_tags, ASF):
-        if "WM/Comments" in mutagen_tags:
-            return _conv_string(mutagen_tags["WM/Comments"])
-        if "Description" in mutagen_tags:
-            return _conv_string(mutagen_tags["Description"])
-
-    # For MP4 files, check specific common keys.
-    if isinstance(mutagen_tags, MP4):
-        if "\xa9cmt" in mutagen_tags:  # iTunes 'comment' tag
-            return _conv_string(mutagen_tags["\xa9cmt"])
-        if "desc" in mutagen_tags:  # General description field in MP4
-            return _conv_string(mutagen_tags["desc"])
-
-    return None
-
 def _conv_track_or_disc(value: Any) -> Optional[int]:
     """
     Converts a track or disc string value to an integer.
@@ -115,13 +78,12 @@ def _conv_track_or_disc(value: Any) -> Optional[int]:
         return None
 
     # Split by '/' and take the first part
-    parts = value_str.split('/')
+    parts = value_str.split("/")
     if parts:
         try:
             return int(parts[0].strip())  # Convert the first part to an integer
         except ValueError:
             return None
-
 
 
 # Tuples of (attribute_name, mutagen_getter_key_string, converter_function)
@@ -133,7 +95,6 @@ TAG_EXTRACTION_RULES = [
     ("album", "album", _conv_string),
     ("genre", "genre", _conv_string),
     ("composer", "composer", _conv_string),
-    ("comment", "comment", _extract_comment_value),
     ("albumartist", "albumartist", _conv_string),
     ("grouping", "grouping", _conv_string),
     ("date", "date", _conv_string),
@@ -225,8 +186,6 @@ class MusicFile:
             mutagen_tags: Optional[mutagen.File] = mutagen.File(path, easy=True)
             mutagen_tags_all: Optional[mutagen.File] = mutagen.File(path).tags
 
-            print(mutagen_tags)
-
             if mutagen_tags is None:
                 print(f"Unsupported file format or no tags found for: {path}")
                 return None
@@ -264,6 +223,10 @@ class MusicFile:
                                 comment_str = comment_str[:255]
                             extracted_tags["comment"] = comment_str
                             break
+
+            # Check again, if comment is still None, set it to an empty string
+            if extracted_tags.get("comment") is None:
+                extracted_tags["comment"] = ""
 
             # Create MusicFile instance, passing extracted tags as keyword arguments
             return cls(

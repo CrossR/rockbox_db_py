@@ -13,6 +13,7 @@ import filecmp
 
 from rockbox_db_py.classes.db_file_type import RockboxDBFileType
 from rockbox_db_py.classes.index_file import IndexFile
+from rockbox_db_py.utils.defs import TAG_TYPES
 from rockbox_db_py.utils.helpers import (
     load_rockbox_database,
     write_rockbox_database,
@@ -142,22 +143,20 @@ def compare_parsed_dbs(original_db: IndexFile, written_db: IndexFile):
             print(f"    ❌ Entry {i} (tag_seek) differs.")
             # For brevity, don't print full arrays here, but note the diff.
             entry_match = False
+        else:
+            print(f"    ✅ Entry {i} (tag_seek) matches.")
         if orig_entry.flag != written_entry.flag:
             print(
                 f"    ❌ Entry {i} (flag) differs: Original={hex(orig_entry.flag)} | Written={hex(written_entry.flag)}"
             )
             entry_match = False
+        else:
+            print(
+                f"    ✅ Entry {i} (flag) matches: {hex(orig_entry.flag)} (matches written)"
+            )
 
         # Also compare parsed tag values for common tags
-        common_tags_to_check = [
-            "artist",
-            "album",
-            "title",
-            "filename",
-            "year",
-            "length",
-        ]
-        for tag_name in common_tags_to_check:
+        for tag_name in TAG_TYPES:
             orig_tag_val = getattr(orig_entry, tag_name)
             written_tag_val = getattr(written_entry, tag_name)
             if orig_tag_val != written_tag_val:
@@ -165,6 +164,10 @@ def compare_parsed_dbs(original_db: IndexFile, written_db: IndexFile):
                     f"      ❌ Entry {i} Tag '{tag_name}': Original='{orig_tag_val}' | Written='{written_tag_val}'"
                 )
                 entry_match = False
+            else:
+                print(
+                    f"      ✅ Entry {i} Tag '{tag_name}': '{orig_tag_val}' (matches written)"
+                )
 
         if not entry_match:
             mismatch_found_in_entries = True
