@@ -62,7 +62,7 @@ class RockboxDBFileType(Enum):
         "filename": "database_6.tcd",
         "tag_index": 6,
         "magic": TAG_MAGIC,
-        "duplicates_possible": True,
+        "duplicates_possible": False,
     }
     ALBUMARTIST = {
         "filename": "database_7.tcd",

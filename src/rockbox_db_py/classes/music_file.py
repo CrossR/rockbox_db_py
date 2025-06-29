@@ -219,14 +219,16 @@ class MusicFile:
                         # If the comment is empty, skip it
                         if comment_str:
                             # Cut it down to 255 characters if it's too long
-                            if len(comment_str) > 255:
+                            if len(comment_str) < 50:
                                 comment_str = comment_str[:255]
+                            else:
+                                comment_str = None
                             extracted_tags["comment"] = comment_str
                             break
 
             # Check again, if comment is still None, set it to an empty string
             if extracted_tags.get("comment") is None:
-                extracted_tags["comment"] = ""
+                extracted_tags["comment"] = " 0000167A 0000167A 00003832 00003832 00000000 00000000 00008608 00008608 00000000 00000000"
 
             # Create MusicFile instance, passing extracted tags as keyword arguments
             return cls(
