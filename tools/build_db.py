@@ -19,12 +19,16 @@
 import argparse
 
 from rockbox_db_py.utils.helpers import (
-    load_rockbox_database,
     write_rockbox_database,
     scan_music_directory,
     build_rockbox_database_from_music_files,
 )
 from rockbox_db_py.utils.defs import TagTypeEnum
+
+from canonicalize import (
+    build_genre_canonical_map,
+    perform_single_genre_canonicalization,
+)
 
 
 def parse_args():
@@ -53,6 +57,12 @@ def parse_args():
         type=int,
         default=None,
         help="Number of processes to use for parsing music files. Defaults to all available CPU cores.",
+    )
+    parser.add_argument(
+        "--genre-file",
+        type=str,
+        default=None,
+        help="Path to a genre file for canonicalizing genres. If provided, will canonicalize genres in the database using this file.",
     )
     parser.add_argument(
         "--no-progress",
@@ -87,40 +97,6 @@ def main():
 
     print(f"Found {len(music_files)} music files to index.")
 
-    # DEBUG: Load the existing database files
-    existing_path = "D:\\User Files\\Downloads\\rockbox\\clean"
-    existing_db = load_rockbox_database(existing_path)
-
-    old_song_entries = [
-        e._loaded_tag_files[TagTypeEnum.filename.value] for e in existing_db.entries
-    ][0]
-    print(f"Loaded existing database with {len(existing_db.entries)} entries.")
-    old_song_paths = [e.tag_data for e in old_song_entries.entries]
-    print(f"Found {len(old_song_paths)} existing song paths in the database.")
-    print("First 10 existing song paths:")
-    for path in old_song_paths[:10]:
-        print(f"  {path}")
-
-    # Use the existing database to sort the music files
-    old_to_index_map = {old_song_paths[i]: i for i in range(len(old_song_paths))}
-    new_to_old_filepath_map = {
-        mf.filepath: mf.filepath.replace(input_music_dir, "/Music/").replace("\\", "/")
-        for mf in music_files
-    }
-
-    print("Mapping new music files to old file paths...")
-    music_files.sort(
-        key=lambda mf: (
-            old_to_index_map.get(
-                new_to_old_filepath_map.get(mf.filepath, ""),
-                len(old_song_paths) + 1,  # If not found, place at the end
-            )
-            if new_to_old_filepath_map.get(mf.filepath, "") in old_to_index_map
-            else len(old_song_paths)
-        )
-    )
-    print("Finished sorting new music files based on existing database.")
-
     # Build the Rockbox database in memory
     print("Building Rockbox database in memory...")
     main_index = build_rockbox_database_from_music_files(
@@ -130,6 +106,22 @@ def main():
     )
     print("Rockbox database built in memory.")
 
+    # Use canonicalize.py to canonicalize the genres
+    if args.genre_file:
+        print(f"Using genre file: {args.genre_file}")
+        genre_canonical_map = build_genre_canonical_map(
+            args.genre_file, roll_up_threshold=10
+        )
+
+        print("Canonicalizing genres in the database...")
+        perform_single_genre_canonicalization(
+            main_index,
+            genre_canonical_map,
+        )
+        print("Genres canonicalized successfully.")
+    else:
+        print("No genre file provided. Skipping genre canonicalization.")
+
     # Build a sort map for sorting entries in a consistent way
     print("Building sort map for titles...")
     sort_map = {TagTypeEnum.title: {}}
@@ -137,12 +129,6 @@ def main():
         mf.title: mf.filepath for mf in music_files if mf.title
     }
     print("Sort map for titles built.")
-
-    print("First 10 entries in the sort map:")
-    for i, (key, value) in enumerate(sort_map[TagTypeEnum.title].items()):
-        if i >= 10:
-            break
-        print(f"  {key}: {value}")
 
     # Write the database to the output directory
     print(f"Writing Rockbox database to: {output_db_dir}")
