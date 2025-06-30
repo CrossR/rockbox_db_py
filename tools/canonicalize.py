@@ -219,8 +219,6 @@ def perform_single_genre_canonicalization(
     Original entries are modified directly; no new IndexFileEntries are created.
     """
 
-    modified_entries_count: int = 0
-
     genre_tag_index: int = TagTypeEnum.genre.value
 
     genre_tag_file: Optional[TagFile] = main_index.loaded_tag_files.get(genre_tag_index)
@@ -230,7 +228,7 @@ def perform_single_genre_canonicalization(
             "Ensure the database is loaded correctly and contains a genre tag file."
         )
 
-    for i, entry_to_modify in enumerate(main_index.entries):
+    for entry_to_modify in main_index.entries:
         # Skip entries that are marked as DELETED.
         if entry_to_modify.flag & FLAG_DELETED:
             continue
@@ -260,7 +258,6 @@ def perform_single_genre_canonicalization(
         )
 
         if chosen_canonical_genre_casefolded != original_genre_casefolded:
-            modified_entries_count += 1
 
             # Ensure the TagFileEntry for this chosen canonical genre exists in the genre TagFile.
             # TagFile.add_entry handles creating new entries or returning existing ones.
@@ -272,11 +269,8 @@ def perform_single_genre_canonicalization(
             entry_to_modify.tag_seek[genre_tag_index] = target_genre_tag_entry
 
     cleaned_genre_entries: List[TagFileEntry] = []
-    removed_genre_strings_count: int = 0
     for genre_entry in genre_tag_file.entries:
-        if ";" in genre_entry.tag_data:
-            removed_genre_strings_count += 1
-        else:
+        if ";" not in genre_entry.tag_data:
             cleaned_genre_entries.append(genre_entry)
 
     genre_tag_file.entries = cleaned_genre_entries

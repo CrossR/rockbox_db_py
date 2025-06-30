@@ -9,6 +9,7 @@ import os
 from typing import Optional, List, Dict, Any
 
 from rockbox_db_py.utils.utils import mtime_to_fat
+from rockbox_db_py.utils.defs import TagTypeEnum
 
 from mediafile import MediaFile, TYPES
 
@@ -105,6 +106,15 @@ class MusicFile:
         self.grouping = self.title if self.grouping is None else self.grouping
         self.canonicalartist = self.artist if self.artist else self.albumartist
         self.composer = self.composer if self.composer else "<Untagged>"
+
+        # Is this a virtual file?
+        # I.e. is this a duplicate of another file, included simply to
+        # populate some other tag that is not present in the original file?
+        # I.e. splitting a string tag into multiple tags, or similar.
+        #
+        # If so, store what tag type this is a virtual file for.
+        # The rest will be zeroed out.
+        self.is_virtual: List[TagTypeEnum] = []
 
     @property
     def filename(self) -> str:

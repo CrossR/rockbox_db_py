@@ -275,7 +275,8 @@ def build_rockbox_database_from_music_files(
 
         # Populate file-based string tags.
         for tag_idx in FILE_TAG_INDICES:
-            tag_name_str: str = TagTypeEnum(tag_idx).name
+            tag_obj: TagTypeEnum = TagTypeEnum(tag_idx)
+            tag_name_str: str = tag_obj.name
 
             processed_tag_value: Optional[str] = None
 
@@ -288,9 +289,14 @@ def build_rockbox_database_from_music_files(
             # For the actual song-specific tag data, we need to ensure
             # we pass over an IDX. For others....we want to pass over the known
             # empty value.
-            if tag_idx in [TagTypeEnum.title.value, TagTypeEnum.filename.value]:
+            if tag_obj in [TagTypeEnum.title, TagTypeEnum.filename]:
                 computed_idx = song_idx
             else:
+                computed_idx = 0xFFFFFFFF
+
+            # If this is a virtual file, we need to set the computed_idx to 0xFFFFFFFF
+            # for everythign but the target tag type.
+            if music_file.is_virtual and tag_idx not in music_file.is_virtual:
                 computed_idx = 0xFFFFFFFF
 
             # Add processed tag value to the corresponding TagFile.

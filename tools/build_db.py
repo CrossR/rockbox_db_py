@@ -33,6 +33,7 @@
 
 
 import argparse
+import copy
 import os
 
 from rockbox_db_py.utils.helpers import (
@@ -141,6 +142,34 @@ def main():
 
     print("Example music file:")
     print(music_files[0].info())
+
+    # Post-process the music files, duplicating them if required to split up the
+    # genres.
+    print("Post-processing music files to handle genre splitting...")
+    new_music_files = []
+    for mf in music_files:
+        split_genres = mf.genre.split(";") if mf.genre else []
+
+        if len(split_genres) <= 1:
+            # If there's only one genre, no need to split
+            new_music_files.append(mf)
+
+        for i, genre in enumerate(split_genres):
+            new_mf = copy.copy(mf)
+            new_mf.genre = genre.strip()
+
+            # We only need one of these files.
+            # If we added every file, we would have duplicates
+            # for all the tags, and Rockbox would not like that.
+            if i != 0:
+                new_mf.is_virtual = [TagTypeEnum.genre]
+
+            # Store the new music file
+            new_music_files.append(new_mf)
+
+    # Replace the original music files with the new ones
+    music_files = new_music_files
+    print(f"Post-processed music files, new total count: {len(music_files)}")
 
     # Build the Rockbox database in memory
     print("Building Rockbox database in memory...")
