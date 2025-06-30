@@ -17,6 +17,7 @@
 
 
 import argparse
+import os
 
 from rockbox_db_py.utils.helpers import (
     write_rockbox_database,
@@ -97,6 +98,24 @@ def main():
 
     print(f"Found {len(music_files)} music files to index.")
 
+    # Process the music files to swap the paths to the Rockbox relative paths
+    print("Processing music files to set Rockbox relative paths...")
+    for mf in music_files:
+        # Remove the input_music_dir prefix from the filepath
+        # I.e. F:/Music/Artist/Album/Song.mp3 becomes
+        # Artist/Album/Song.mp3
+        relative_path = os.path.relpath(mf.filepath, start=input_music_dir)
+
+        # Then, move to the Rockbox relative path
+        # I.e. Artist/Album/Song.mp3 becomes /Music/Artist/Album/Song.mp3
+        rockbox_relative_path = os.path.join(args.output_rockbox_path, relative_path)
+
+        # Replace any errant backslashes with forward slashes
+        rockbox_relative_path = rockbox_relative_path.replace("\\", "/")
+
+        # Set the new filepath
+        mf.filepath = rockbox_relative_path
+
     print("Example music file:")
     print(music_files[0].info())
 
@@ -104,8 +123,6 @@ def main():
     print("Building Rockbox database in memory...")
     main_index = build_rockbox_database_from_music_files(
         music_files,
-        input_folder=input_music_dir,
-        output_rockbox_path_prefix=args.output_rockbox_path,
     )
     print("Rockbox database built in memory.")
 

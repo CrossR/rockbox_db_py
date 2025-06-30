@@ -95,11 +95,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--artists", action="store_true", help="Print unique artists.")
     parser.add_argument("--tracks", action="store_true", help="Print unique tracks.")
     parser.add_argument("--genres", action="store_true", help="Print unique genres.")
+    parser.add_argument(
+        "--composer", action="store_true", help="Print unique composers."
+    )
 
     args = parser.parse_args()
 
     # If nothing is specified, default to printing albums
-    if not any([args.stats, args.artists, args.tracks, args.genres]):
+    if not any([args.stats, args.artists, args.tracks, args.genres, args.composer]):
         args.albums = True
 
     return args
@@ -153,6 +156,15 @@ def main():
 
         for genre in sorted(unique_genres):
             print(f"{genre} ({genre_count.get(genre, 0)})")
+
+    if args.composer:
+        print("\n--- Unique Composers ---")
+        unique_composers = set()
+        for entry in main_index.entries:
+            if valid_entry(entry, "composer"):
+                unique_composers.add(entry.composer)
+        for composer in sorted(unique_composers):
+            print(composer)
 
     if args.stats:
         get_db_stats(main_index)

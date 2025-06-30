@@ -221,8 +221,6 @@ def scan_music_directory(
 
 def build_rockbox_database_from_music_files(
     music_files: List[MusicFile],
-    input_folder: str,
-    output_rockbox_path_prefix: str,
 ) -> IndexFile:
     """
     Builds a complete Rockbox database (IndexFile and associated TagFiles)
@@ -230,9 +228,6 @@ def build_rockbox_database_from_music_files(
 
     Args:
         music_files: A list of MusicFile objects, representing the music library.
-        input_folder: The base path where music files are located on the filesystem.
-        output_rockbox_path_prefix: The base path where music files will reside
-                                    on the Rockbox device (e.g., "/Music/").
 
     Returns:
         A new IndexFile object fully populated with all necessary data.
@@ -284,30 +279,13 @@ def build_rockbox_database_from_music_files(
 
             processed_tag_value: Optional[str] = None
 
-            # Special handling for filename tag (convert PC path to Rockbox relative path).
-            if tag_name_str == "filename":
-                # First, remove the input folder prefix from the file path.
-                relative_path: str = os.path.relpath(
-                    music_file.filepath, start=input_folder
-                )
-
-                # Then, convert to Rockbox path format (replace backslashes with forward slashes).
-                rockbox_relative_path: str = relative_path.replace("\\", "/")
-
-                # Finally, prepend the Rockbox output path prefix.
-                processed_tag_value = os.path.join(
-                    output_rockbox_path_prefix, rockbox_relative_path
-                )
-
-            # General handling for other string tags.
+            tag_value_from_music_file: Optional[str] = getattr(
+                music_file, tag_name_str
+            )
+            if tag_value_from_music_file is not None:
+                processed_tag_value = tag_value_from_music_file
             else:
-                tag_value_from_music_file: Optional[str] = getattr(
-                    music_file, tag_name_str
-                )
-                if tag_value_from_music_file is not None:
-                    processed_tag_value = tag_value_from_music_file
-                else:
-                    processed_tag_value = None
+                processed_tag_value = None
 
             # For the actual song-specific tag data, we need to ensure
             # we pass over an IDX. For others....we want to pass over the known
