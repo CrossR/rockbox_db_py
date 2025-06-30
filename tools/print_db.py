@@ -19,37 +19,37 @@ def valid_entry(entry, prop) -> bool:
 
 
 def print_album_artist_album_data(main_index: IndexFile):
-    print("\n--- Unique Artist & Album Combinations ---")
 
-    unique_combinations = set()
+    albums = defaultdict(list)
 
-    for i, index_entry in enumerate(main_index.entries):
+    for _, index_entry in enumerate(main_index.entries):
+
         artist = index_entry.albumartist
         year = index_entry.year
         album = index_entry.album
 
-        # Handle cases where the tag might not exist
-        artist_display = artist if artist is not None else "(N/A)"
-        album_display = album if album is not None else "(N/A)"
-        year_display = year if year is not None else ""
+        if not album or not artist:
+            continue
 
         # Add the unique combination to the set
-        unique_combinations.add((artist_display, album_display, year_display))
+        if f"{year} - {album}" not in albums[artist]:
+            albums[artist].append(f"{year} - {album}")
 
-    if not unique_combinations:
+    if len(albums) == 0:
         print("No artist and album combinations found.")
         return
 
     # Sort the unique combinations for consistent output
-    sorted_unique_combinations = sorted(list(unique_combinations))
+    sorted_artists = sorted(albums.keys())
+    sorted_albums = {a: sorted(albums[a]) for a in sorted_artists}
 
     print(f"{'Artist':<30} | {'Album':<50}")
     print("-" * 85)
 
-    for a, al, y in sorted_unique_combinations:
-        print(f"{a:<30} | {y} - {al:<50}")
-
-    print("\n--- Database loading and unique artist/album output complete ---")
+    for artist, albums in sorted_albums.items():
+        print(f"{artist:<30} | {' ' * 50}")
+        for album in albums:
+            print(f"{' ' * 30} | {album:<50}")
 
 
 def get_db_stats(main_index: IndexFile):

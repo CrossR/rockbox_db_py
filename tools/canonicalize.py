@@ -10,8 +10,6 @@
 
 import argparse
 from collections import Counter, deque
-import os
-import shutil
 import string
 import sys
 from typing import Optional, List, Dict
@@ -20,38 +18,77 @@ import yaml
 
 from rockbox_db_py.classes.db_file_type import RockboxDBFileType
 from rockbox_db_py.classes.index_file import IndexFile
-from rockbox_db_py.utils.defs import TagTypeEnum, FILE_TAG_INDICES, FLAG_DELETED
+from rockbox_db_py.utils.defs import TagTypeEnum, FLAG_DELETED
 from rockbox_db_py.classes.tag_file import TagFile
 from rockbox_db_py.classes.tag_file_entry import TagFileEntry
 from rockbox_db_py.utils.helpers import load_rockbox_database, write_rockbox_database
 
+# Define a type alias for a genre map
+# A genre map is a dictionary where keys are genre names
+# and values are either:
+# - a string representing a parent genre, or
+# - a list of sub-genres (which can be strings or nested dictionaries).
+GenreMap = Dict[str, str | List[str | Dict[str, List]]]
 
-def build_genre_canonical_map(
-    genre_map_filepath: str, roll_up_threshold: int = 10
-) -> Dict[str, str]:
+def get_sub_genres(parent_genre: str, genres: str | List[str] | GenreMap) -> Dict[str, str]:
+    """Recursively retrieves all sub-genres for a given genre.
+    Args:
+        parent_genre: The name of the parent genre.
+        genres: A dictionary representing a genre and its sub-genres.
+    Returns:
+        A dictionary mapping sub-genre names to their parent genre name.
+    """
+
+    sub_genres = {}
+
+    # Deal with the easiest case first: Is the GenreMap a simple string?
+    if isinstance(genres, str):
+        # If it's a string, it means this is a leaf genre with no sub-genres.
+        sub_genres[genres.casefold()] = parent_genre.casefold()
+        return sub_genres
+
+    # Is it a list?
+    elif isinstance(genres, list):
+        # If it's a list, we need to iterate through each item,
+        # recursively calling this function for each item.
+        for item in genres:
+            results = get_sub_genres(parent_genre, item)
+            sub_genres.update(results)
+
+    # Finally, if its a dictionary, we assume it has a single key
+    # which is the genre name, and its value is either a string or a list of
+    # sub-genres.
+    # This is the case for nested genres.
+    elif isinstance(genres, dict):
+        sub_genre = next(iter(genres))  # Get the first (and only) key
+        sub_genre_value = genres[sub_genre]
+
+        # Add the sub-genre to the map, pointing to itself.
+        sub_genres[sub_genre.casefold()] = sub_genre.casefold()
+
+        # Recursively get sub-genres for this sub-genre
+        results = get_sub_genres(sub_genre.casefold(), sub_genre_value)
+        sub_genres.update(results)
+
+    else:
+        raise ValueError(
+            f"Invalid genre structure: expected str, list, or dict, got {type(genres)}"
+        )
+
+    return sub_genres
+
+def build_genre_canonical_map(genre_map_filepath: str) -> Dict[str, str]:
     """
     Parses a YAML file containing genre hierarchies and builds a canonical map.
-    This version canonicalizes based on a 'roll_up_threshold' for descendant count.
 
     Args:
         genre_map_filepath: Path to the YAML file defining genre hierarchies.
-        roll_up_threshold: If a genre (at any depth) has fewer descendants than this threshold,
-                           it (and its direct children) will roll up to its immediate parent's canonical form.
-                           If a genre meets or exceeds the threshold, its direct children will roll up to it.
-                           A threshold of 0 means no size-based roll-up (only top-level parents are canonical).
 
     Returns:
         A dictionary mapping lowercased sub-genre names to their lowercased
         canonical parent names.
     """
     canonical_map: Dict[str, str] = {}
-
-    # Store all nodes encountered, with their parent, depth, and children (initially)
-    # {genre_name: {'parent': parent_name, 'depth': d, 'children_names': [c1, c2], 'descendants': 0}}
-    all_genre_nodes: Dict[str, Dict] = {}
-
-    # List to store top-level genres for initial traversal
-    top_level_genre_names: List[str] = []
 
     try:
         with open(genre_map_filepath, "r", encoding="utf-8") as f:
@@ -66,188 +103,27 @@ def build_genre_canonical_map(
     if not isinstance(genre_data, list):
         raise ValueError("Genre mapping YAML should be a list of top-level genres.")
 
-    # --- Pass 1: Build a flattened graph (all_genre_nodes) with parents and depths ---
-    # Use a queue for BFS traversal (current_yaml_node, parent_name, depth)
-    q = deque()
-
-    for top_level_entry in genre_data:
-        if isinstance(top_level_entry, dict):
-            # Top-level is a dict, e.g., "- rock: [...]"
-            for top_genre_name, children_data in top_level_entry.items():
-                top_genre_name_lower = top_genre_name.strip().casefold()
-                top_level_genre_names.append(
-                    top_genre_name_lower
-                )  # Keep track of top-level names
-                all_genre_nodes[top_genre_name_lower] = {
-                    "parent": None,
-                    "depth": 0,
-                    "children_names": [],
-                }
-                # Add children to queue for processing: (children_data_for_this_genre, this_genre_name, its_depth)
-                q.append((children_data, top_genre_name_lower, 0))
-        else:  # Simple string top-level genre, e.g., "- Pop"
-            top_genre_name_lower = str(top_level_entry).strip().casefold()
-            top_level_genre_names.append(top_genre_name_lower)
-            all_genre_nodes[top_genre_name_lower] = {
-                "parent": None,
-                "depth": 0,
-                "children_names": [],
-            }
-
-    # Process queue to populate all_genre_nodes (the flattened graph)
-    while q:
-        current_children_data, current_parent_name, current_depth = q.popleft()
-
-        if isinstance(
-            current_children_data, list
-        ):  # If there are children listed under current_parent_name
-            for item in current_children_data:
-                if isinstance(item, dict):
-                    for child_genre_name, child_children_data in item.items():
-                        child_genre_name_lower = child_genre_name.strip().casefold()
-                        all_genre_nodes[child_genre_name_lower] = {
-                            "parent": current_parent_name,
-                            "depth": current_depth + 1,
-                            "children_names": [],  # This list will be populated below
-                        }
-                        # Link child to parent's children_names
-                        all_genre_nodes[current_parent_name]["children_names"].append(
-                            child_genre_name_lower
-                        )
-                        # Add child's children to queue
-                        q.append(
-                            (
-                                child_children_data,
-                                child_genre_name_lower,
-                                current_depth + 1,
-                            )
-                        )
-                else:  # Simple string child, e.g., "- post-britpop"
-                    child_genre_name_lower = str(item).strip().casefold()
-                    all_genre_nodes[child_genre_name_lower] = {
-                        "parent": current_parent_name,
-                        "depth": current_depth + 1,
-                        "children_names": [],  # Leaves have no children
-                    }
-                    all_genre_nodes[current_parent_name]["children_names"].append(
-                        child_genre_name_lower
-                    )
-
-    # --- Pass 2: Calculate descendant counts (bottom-up traversal) ---
-    # Initialize descendants to 0 for all nodes (will be calculated)
-    for name in all_genre_nodes:
-        all_genre_nodes[name]["descendants"] = 0
-
-    # Stack for post-order (bottom-up) traversal: (genre_name, visited_children_count)
-    # Use a set to track fully processed nodes whose descendant count is finalized
-    processed_descendants_finalized = set()
-
-    # Start the stack with all top-level genres for a full traversal
-    traversal_stack = [(name, 0) for name in top_level_genre_names]
-
-    # We need a list of all nodes to ensure we visit them in a way that allows descendant calculation
-    # A reverse topological sort or iterating until convergence is safer
-
-    # Better: Iteratively calculate descendants until all are processed
-    # Leaves are the easiest to start with (descendants = 1)
-    for name, data in all_genre_nodes.items():
-        if not data["children_names"]:  # It's a leaf node
-            all_genre_nodes[name]["descendants"] = 1
-            processed_descendants_finalized.add(name)
-
-    while len(processed_descendants_finalized) < len(all_genre_nodes):
-        nodes_updated_in_pass = False
-        for name, data in all_genre_nodes.items():
-            if name in processed_descendants_finalized:
-                continue  # Already processed
-
-            # If all children have their descendants calculated
-            if all(
-                child_name in processed_descendants_finalized
-                for child_name in data["children_names"]
-            ):
-                # Sum children's descendants and add 1 for self
-                data["descendants"] = 1 + sum(
-                    all_genre_nodes[child_name]["descendants"]
-                    for child_name in data["children_names"]
-                )
-                processed_descendants_finalized.add(name)
-                nodes_updated_in_pass = True
-
-        if not nodes_updated_in_pass and len(processed_descendants_finalized) < len(
-            all_genre_nodes
-        ):
-            # This indicates a cycle in the graph or unreachables if not all processed,
-            # but YAML hierarchy should prevent cycles. So, it should converge.
-            # If it doesn't, there's an issue with the YAML data structure or logic.
-            print(
-                "Warning: Could not calculate descendants for all nodes (possible structural issue in YAML)."
+    # Build a map between sub-genres and their canonical parents
+    # Entries here look like:
+    # {"rock": ["rock", "hard rock", "soft rock", {"alternative rock": ["indie-rock", "britpop"]]}
+    for genre_dict in genre_data:
+        if len(genre_dict.keys()) != 1:
+            raise ValueError(
+                "Each top-level genre in the YAML file should be a single key."
             )
-            break
 
-    # --- Pass 3: Determine canonical forms based on depth and descendant count ---
-    for genre_name_lower, data in all_genre_nodes.items():
-        depth = data["depth"]
-        descendants = data["descendants"]
-        parent_name = data["parent"]
+        genre = str(list(genre_dict.keys())[0])
+        sub_genres = genre_dict.values()
 
-        # Default canonical parent is itself (most specific)
-        canonical_parent = genre_name_lower
+        # Add the top-level genre itself to the map
+        canonical_map[genre.casefold()] = genre.casefold()
 
-        # Rule application (based on user's examples):
-        # We roll up from deepest to highest, applying thresholds.
+        for sub_genre in sub_genres:
+            result = get_sub_genres(genre.casefold(), sub_genre)
+            canonical_map.update(result)
 
-        # If it's a sub-genre (depth > 0)
-        if depth > 0:
-            # Check its immediate parent's (parent_name) descendants count
-            parent_data = all_genre_nodes.get(parent_name)
-            if parent_data:
-                parent_descendants = parent_data["descendants"]
-
-                # If parent is 'heavy metal' and its descendants are >= threshold,
-                # then children canonicalize to 'heavy metal'.
-                # E.g., 'death metal' -> 'heavy metal' (if 'heavy metal' is large enough)
-                # If parent is 'alternative rock' and its descendants are >= threshold,
-                # then children canonicalize to 'alternative rock'.
-                # E.g., 'britpop' -> 'alternative rock' (if 'alternative rock' is large enough)
-
-                if parent_descendants >= roll_up_threshold:
-                    # Current genre's canonical form is its immediate parent
-                    canonical_parent = parent_name
-                else:
-                    # If parent is too small, canonicalize to parent's parent (grandparent),
-                    # or ultimately to the top-level parent if it keeps rolling up.
-                    # This means we need to find the highest ancestor that IS large enough,
-                    # or the top-level parent if none are.
-
-                    # Traverse up to find the canonical parent for this small branch
-                    current_ancestor_name = parent_name
-                    while current_ancestor_name:
-                        ancestor_data = all_genre_nodes.get(current_ancestor_name)
-                        if (
-                            ancestor_data
-                            and ancestor_data["descendants"] >= roll_up_threshold
-                        ):
-                            canonical_parent = current_ancestor_name
-                            break
-                        current_ancestor_name = (
-                            ancestor_data["parent"] if ancestor_data else None
-                        )
-                    if (
-                        not current_ancestor_name
-                    ):  # Reached top without finding large enough parent
-                        # Canonicalize to the top-level ancestor
-                        current_ancestor_name = genre_name_lower
-                        while all_genre_nodes.get(current_ancestor_name, {}).get(
-                            "parent"
-                        ):
-                            current_ancestor_name = all_genre_nodes[
-                                current_ancestor_name
-                            ]["parent"]
-                        canonical_parent = current_ancestor_name
-
-        canonical_map[genre_name_lower] = canonical_parent
-
+    # At this point we have a map where keys are sub-genres and values are their
+    # canonical parent genres, all in lowercase.
     return canonical_map
 
 
@@ -392,9 +268,6 @@ def perform_single_genre_canonicalization(
 
             # Update the IndexFileEntry's genre pointer.
             entry_to_modify.tag_seek[genre_tag_index] = target_genre_tag_entry
-
-    # Cleanse the genre TagFile (database_2.tcd) of multi-value strings.
-    initial_genre_entries_count: int = len(genre_tag_file.entries)
 
     cleaned_genre_entries: List[TagFileEntry] = []
     removed_genre_strings_count: int = 0

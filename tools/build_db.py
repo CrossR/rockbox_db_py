@@ -129,9 +129,7 @@ def main():
     # Use canonicalize.py to canonicalize the genres
     if args.genre_file:
         print(f"Using genre file: {args.genre_file}")
-        genre_canonical_map = build_genre_canonical_map(
-            args.genre_file, roll_up_threshold=10
-        )
+        genre_canonical_map = build_genre_canonical_map(args.genre_file)
 
         print("Canonicalizing genres in the database...")
         perform_single_genre_canonicalization(

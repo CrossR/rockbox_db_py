@@ -139,7 +139,6 @@ def compare_parsed_dbs(original_db: IndexFile, written_db: IndexFile):
         # Compare raw tag_seek arrays and flags
         if orig_entry.tag_seek != written_entry.tag_seek:
             print(f"    ❌ Entry {i} (tag_seek) differs.")
-            # For brevity, don't print full arrays here, but note the diff.
             entry_match = False
         else:
             print(f"    ✅ Entry {i} (tag_seek) matches.")
@@ -171,7 +170,7 @@ def compare_parsed_dbs(original_db: IndexFile, written_db: IndexFile):
             mismatch_found_in_entries = True
             all_parsed_match = False
         else:
-            if i < 5:  # Only print for first few if they match
+            if i < 5:
                 print(f"    ✅ Entry {i} matches parsed data.")
 
     if not mismatch_found_in_entries:
@@ -330,7 +329,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    # load_and_write_rockbox_database(args.input_db_dir, args.output_db_dir)
+    load_and_write_rockbox_database(args.input_db_dir, args.output_db_dir)
 
     if args.compare:
         success = compare_files(args.input_db_dir, args.output_db_dir)
