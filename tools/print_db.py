@@ -18,6 +18,24 @@ def valid_entry(entry, prop) -> bool:
     return not (entry.flag & FLAG_DELETED) and getattr(entry, prop) is not None
 
 
+def print_first_n_entries(main_index: IndexFile, n: int = 10):
+    """Print the first n entries in the Rockbox database."""
+    print(f"\n--- First {n} Entries ---")
+    for i, entry in enumerate(main_index.entries[:n]):
+        if valid_entry(entry, "title"):
+            print(f"{i + 1:>3}: {entry.title} by {entry.artist} ({entry.album})")
+            print(f"    Tags:")
+            for tag_type in TagTypeEnum:
+                tag_value = getattr(entry, tag_type.name)
+                if tag_value is not None:
+                    print(f"      {tag_type.name}: {tag_value}")
+        else:
+            print(f"{i + 1:>3}: [Invalid Entry]")
+
+    if len(main_index.entries) > n:
+        print(f"... and {len(main_index.entries) - n} more entries.")
+
+
 def print_album_artist_album_data(main_index: IndexFile):
 
     albums = defaultdict(list)
@@ -85,6 +103,12 @@ def parse_args() -> argparse.Namespace:
 
     # Options for additional functionality
     parser.add_argument(
+        "--first-n",
+        type=int,
+        default=10,
+        help="Print the first N entries in the database (default: 10).",
+    )
+    parser.add_argument(
         "--stats", action="store_true", help="Print statistics about the database."
     )
     parser.add_argument(
@@ -101,9 +125,19 @@ def parse_args() -> argparse.Namespace:
 
     args = parser.parse_args()
 
-    # If nothing is specified, default to printing albums
-    if not any([args.stats, args.artists, args.tracks, args.genres, args.composer]):
-        args.albums = True
+    # If nothing is specified, default to printing first 10 entries
+    if not any(
+        [
+            args.first_n,
+            args.stats,
+            args.albums,
+            args.artists,
+            args.tracks,
+            args.genres,
+            args.composer,
+        ]
+    ):
+        args.first_n = 10
 
     return args
 
@@ -122,6 +156,10 @@ def main():
     print(f"Commit ID: {main_index.commitid}")
     print(f"Dirty Flag: {main_index.dirty}")
     print(f"Total Entries: {main_index.entry_count}")
+
+
+    if args.first_n:
+        print_first_n_entries(main_index, args.first_n)
 
     if args.albums:
         print_album_artist_album_data(main_index)
