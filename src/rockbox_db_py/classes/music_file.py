@@ -97,12 +97,23 @@ class MusicFile:
         )
 
         # Get some useful derived properties
-        self.filename: str = os.path.basename(filepath)
         self.file_extension: str = os.path.splitext(filepath)[1].lower()
 
         self.grouping = self.title if self.grouping is None else self.grouping
         self.canonicalartist = self.artist if self.artist else self.albumartist
         self.composer = self.composer if self.composer else "<Untagged>"
+
+    @property
+    def filename(self) -> str:
+        """
+        Rockbox expects a "filename" property that is really the full path.
+        This is used, rather than a self.filename property, to ensure that
+        the file path is always available and consistent.
+
+        Returns:
+            str: The file path associated with this music file.
+        """
+        return self.filepath
 
     @classmethod
     def from_filepath(cls, path: str) -> Optional["MusicFile"]:
