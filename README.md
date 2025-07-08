@@ -6,7 +6,7 @@ An implementation of the Rockbox database, in Python.
 
  - Multi-threaded indexing of your music collection
    - Should be much faster, especially on large collections, usually less than a
-   secodn per 1000 files.
+   second per 1000 files.
  - Uses the `mediafile` library to read metadata from files, so it supports
    a wide range of audio formats.
     - Battle tested and used in `beets` and more.
@@ -16,6 +16,33 @@ An implementation of the Rockbox database, in Python.
     - This is REALLY useful for things like the genre, where you can "canonicalize"
         a list of genres to a single genre, significantly reducing the entries
         in the database.
+
+# Current Caveats
+
+There is a few caveats to be aware of, as this is a work in progress:
+
+ - This is a brand new database every time. You aren't keeping around any of
+   your stats, ratings, playtimes etc. from the old database.
+   - This is mostly a design choice for now...I use last.fm etc to track those
+   things, so didn't see the point in trying to keep them around. Some partial
+   support may be possible, but I haven't really looked into it yet.
+
+ - The main "build_db.py" script currently assumes a 1:1 mapping between
+   the music files on your device and the files in your music collection.
+   - I.e. it assumes that if you have a file at "F:/Music/Artist/Album/Song.mp3",
+     then that is the same file as "/Music/Artist/Album/Song.mp3" on your device.
+   - If you have a more complex setup, you can potentially make changes to the
+     `build_db.py` script to handle that, but you will need to have some
+     programmatic way to keep the two in sync.
+
+ - There isn't really any extensive testing done yet. I've used it, it works for
+   my and my music, but other setups may not work. If you find something that
+   doesn't work, please report it as an issue on GitHub, and I will try to fix it.
+
+ - I'm not 100% sure my comment parsing code is working properly. The DB works on
+   my iPod Classic 5, but the comments values in some places (even in regular
+   Rockbox) are non-sensical. I don't care about comments, so I haven't looked
+   into it in a lot of detail, and the DB works fine, so it isn't a priority.
 
 # Installation
 
