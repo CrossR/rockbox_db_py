@@ -9,14 +9,13 @@
 # python canonicalize.py <db_path> <output_db_path> <genre-file> [--dry-run]
 
 import argparse
-from collections import Counter, deque
+from collections import Counter
 import string
 import sys
 from typing import Optional, List, Dict
 
 import yaml
 
-from rockbox_db_py.classes.db_file_type import RockboxDBFileType
 from rockbox_db_py.classes.index_file import IndexFile
 from rockbox_db_py.utils.defs import TagTypeEnum, FLAG_DELETED
 from rockbox_db_py.classes.tag_file import TagFile
@@ -30,7 +29,10 @@ from rockbox_db_py.utils.helpers import load_rockbox_database, write_rockbox_dat
 # - a list of sub-genres (which can be strings or nested dictionaries).
 GenreMap = Dict[str, str | List[str | Dict[str, List]]]
 
-def get_sub_genres(parent_genre: str, genres: str | List[str] | GenreMap) -> Dict[str, str]:
+
+def get_sub_genres(
+    parent_genre: str, genres: str | List[str] | GenreMap
+) -> Dict[str, str]:
     """Recursively retrieves all sub-genres for a given genre.
     Args:
         parent_genre: The name of the parent genre.
@@ -76,6 +78,7 @@ def get_sub_genres(parent_genre: str, genres: str | List[str] | GenreMap) -> Dic
         )
 
     return sub_genres
+
 
 def build_genre_canonical_map(genre_map_filepath: str) -> Dict[str, str]:
     """
@@ -219,13 +222,12 @@ def perform_single_genre_canonicalization(
     modified_entries_count: int = 0
 
     genre_tag_index: int = TagTypeEnum.genre.value
-    genre_file_type: RockboxDBFileType = RockboxDBFileType.GENRE
 
     genre_tag_file: Optional[TagFile] = main_index.loaded_tag_files.get(genre_tag_index)
     if not genre_tag_file:
         raise ValueError(
-            f"Genre TagFile (database_2.tcd) not found in the loaded database. "
-            f"Ensure the database is loaded correctly and contains a genre tag file."
+            "Genre TagFile (database_2.tcd) not found in the loaded database. "
+            "Ensure the database is loaded correctly and contains a genre tag file."
         )
 
     for i, entry_to_modify in enumerate(main_index.entries):

@@ -5,11 +5,8 @@
 import argparse
 from collections import defaultdict
 
-from rockbox_db_py.classes.music_file import MusicFile
-from rockbox_db_py.classes.db_file_type import RockboxDBFileType
-from rockbox_db_py.classes.tag_file import TagFile
 from rockbox_db_py.classes.index_file import IndexFile
-from rockbox_db_py.utils.defs import TagTypeEnum, FLAG_DELETED, FILE_TAG_INDICES
+from rockbox_db_py.utils.defs import TagTypeEnum, FLAG_DELETED
 from rockbox_db_py.utils.helpers import load_rockbox_database
 
 
@@ -24,7 +21,7 @@ def print_first_n_entries(main_index: IndexFile, n: int = 10):
     for i, entry in enumerate(main_index.entries[:n]):
         if valid_entry(entry, "title"):
             print(f"{i + 1:>3}: {entry.title} by {entry.artist} ({entry.album})")
-            print(f"    Tags:")
+            print("    Tags:")
             for tag_type in TagTypeEnum:
                 tag_value = getattr(entry, tag_type.name)
                 if tag_value is not None:
@@ -37,11 +34,9 @@ def print_first_n_entries(main_index: IndexFile, n: int = 10):
 
 
 def print_album_artist_album_data(main_index: IndexFile):
-
     albums = defaultdict(list)
 
     for _, index_entry in enumerate(main_index.entries):
-
         artist = index_entry.albumartist
         year = index_entry.year
         album = index_entry.album
@@ -80,10 +75,8 @@ def get_db_stats(main_index: IndexFile):
 
     # Count all the tags
     tag_set_list = defaultdict(list)
-    tags = main_index._loaded_tag_files.values()
 
     for entry in main_index.entries:
-        tag_set = {}
         for tag_type in TagTypeEnum:
             result = getattr(entry, tag_type.name)
             tag_set_list[tag_type].append(result)
@@ -143,7 +136,6 @@ def parse_args() -> argparse.Namespace:
 
 
 def main():
-
     args = parse_args()
     main_index = load_rockbox_database(args.db_path)
 
@@ -156,7 +148,6 @@ def main():
     print(f"Commit ID: {main_index.commitid}")
     print(f"Dirty Flag: {main_index.dirty}")
     print(f"Total Entries: {main_index.entry_count}")
-
 
     if args.first_n:
         print_first_n_entries(main_index, args.first_n)

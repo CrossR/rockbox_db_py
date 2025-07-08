@@ -3,7 +3,6 @@
 from multiprocessing import Pool
 import os
 import shutil
-import string
 from typing import Optional, List, Dict, Union
 
 from rockbox_db_py.classes.db_file_type import RockboxDBFileType
@@ -114,13 +113,13 @@ def write_rockbox_database(
     if not os.path.exists(output_db_dir):
         try:
             os.makedirs(output_db_dir)
-        except OSError as e:
+        except OSError:
             raise
     elif os.path.exists(output_db_dir) and os.listdir(output_db_dir):
         try:
             shutil.rmtree(output_db_dir)
             os.makedirs(output_db_dir)
-        except OSError as e:
+        except OSError:
             raise
 
     try:
@@ -129,7 +128,6 @@ def write_rockbox_database(
         # to the TagFileEntry objects, including any newly added ones.
         loaded_tag_files: Dict[int, TagFile] = main_index.loaded_tag_files
         for tag_index, tag_file_obj in loaded_tag_files.items():
-
             db_file_type: RockboxDBFileType = RockboxDBFileType.from_tag_index(
                 tag_index
             )
@@ -279,9 +277,7 @@ def build_rockbox_database_from_music_files(
 
             processed_tag_value: Optional[str] = None
 
-            tag_value_from_music_file: Optional[str] = getattr(
-                music_file, tag_name_str
-            )
+            tag_value_from_music_file: Optional[str] = getattr(music_file, tag_name_str)
             if tag_value_from_music_file is not None:
                 processed_tag_value = tag_value_from_music_file
             else:

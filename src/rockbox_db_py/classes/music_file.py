@@ -1,6 +1,5 @@
 # src/rockbox_db_py/classes/music_file.py
 
-from datetime import datetime
 from dataclasses import dataclass
 import os
 from typing import Optional, List, Dict, Any
@@ -134,7 +133,6 @@ class MusicFile:
 
             extracted_tags: Dict[str, Any] = {}
             for tag_props in ROCKBOX_TO_MEDIAFILE:
-
                 rockbox_name = tag_props.rockbox_name
                 mediafile_tags = tag_props.mediafile_names
                 tag_type = tag_props.type

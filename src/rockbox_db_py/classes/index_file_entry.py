@@ -3,7 +3,6 @@
 import struct
 from typing import Dict, Optional, List, Union
 
-from rockbox_db_py.classes.db_file_type import RockboxDBFileType
 from rockbox_db_py.classes.tag_file import TagFile
 from rockbox_db_py.classes.tag_file_entry import TagFileEntry
 from rockbox_db_py.classes.db_file_type import RockboxDBFileType

@@ -30,7 +30,7 @@ def load_and_write_rockbox_database(
     Loads a Rockbox database from input_db_dir and writes it to output_db_dir
     using the new helper functions.
     """
-    print(f"--- Processing Rockbox database ---")
+    print("--- Processing Rockbox database ---")
     print(f"Input Directory: {input_db_dir}")
     print(f"Output Directory: {output_db_dir}")
 

@@ -1,9 +1,9 @@
 # src/rockbox_db_py/classes/tag_file.py
 
 import os
-from typing import Optional, List, Dict  # Used for type hinting
+from typing import Optional, List, Dict
 
-from rockbox_db_py.utils.defs import TAG_TYPES, ENCODING  # Ensure ENCODING is imported
+from rockbox_db_py.utils.defs import TAG_TYPES
 from rockbox_db_py.classes.db_file_type import RockboxDBFileType
 from rockbox_db_py.utils.struct_helpers import read_uint32, write_uint32
 from rockbox_db_py.classes.tag_file_entry import TagFileEntry
