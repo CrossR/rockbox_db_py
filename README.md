@@ -25,6 +25,11 @@ There is a few caveats to be aware of, as this is a work in progress:
   version, and if you go far enough back and the DB changes (either in spec, or
   in version number), it WILL not work.
 
+- We assume a little endian system, which works fine for iPods. If your device
+  isn't an iPod, it may not work. It could be as simple as changing
+  `ENDIANNESS_CHAR = "<"` to `ENDIANNESS_CHAR = ">"` in the
+  `utils/struct_helpers.py`, but it is not something I've tested.
+
 - This is a brand new database every time. You aren't keeping around any of
   your stats, ratings, playtimes etc. from the old database.
 
@@ -45,7 +50,7 @@ There is a few caveats to be aware of, as this is a work in progress:
     programmatic way to keep the two in sync.
 
 - There isn't really any extensive testing done yet. I've used it, it works for
-  my and my music, but other setups may not work. If you find something that
+  me and my music, but other setups may not work. If you find something that
   doesn't work, please report it as an issue on GitHub, and I will try to fix it.
 
 - I'm not 100% sure my comment parsing code is working properly. The DB works on
@@ -71,7 +76,10 @@ cd rockbox_db_py
 # Setup the virtual environment and install the dependencies
 uv sync
 
-# Install the current project in editable mode
+# Install rockbox_db_py in editable mode. I.e. setup this project so that you
+# can use it. "editable mode" just means if you make any changes to the code,
+# they will be reflected straight away, without needing to reinstall, which
+# is useful for development.
 uv pip install -e .
 ```
 
@@ -108,14 +116,18 @@ Once you have the project setup, the steps are as follows:
    This will fully parse your existing DB to memory, then write it out using the
    python-based Rockbox DB format. Again, if this fails, report it as an issue
    and stop here. You should also be able to run `print_db.py` on the new copy
-   to verify that it looks correct.
+   to verify that it looks correct. If this works, we can both read and write
+   your Rockbox database, which is a good sign that we can make a new one.
 
-4. Okay, the final step. My code can somehow parse your existing DB, so
-   let's try to make a new one.
+4. Okay, the final step. My code can parse your existing DB, so let's try to
+   make a new one.
+
    ```bash
    uv run python tools/build_db.py "D:\Media\Music" "/Music/" "D:\Path\To\Rockbox\db\new_db"
    ```
+
    This command takes 3 arguments:
+
    - The path to your music collection, which will be indexed.
    - The path to the music collection as it should appear in the Rockbox DB.
      I.e. if when you plugin over USB, your music collection is at `F:/Music`,
@@ -125,11 +137,23 @@ Once you have the project setup, the steps are as follows:
      output from `print_db.py` on your original DB should help you figure
      out what this should be.
    - The folder where to write the new database to. This should be a folder
-     that does not already exist, as it will be created.
-     You should see a progress bar as your music files are read, and then a brief
-     print out of the first music file we parse. After that, the script will
-     write out the new database with a second progress bar (though this is
-     usually very quick). After that point, you can run `print_db.py` on the new
-     database to verify that it looks correct, before actually trying it on your
-     device. I find a reboot of the device after copying is best, just to ensure
-     everything is reloaded correctly.
+     that does not already exist, as it will be created, and we will delete
+     the contexts of that folder before writing the new database to it.
+
+   You should see a progress bar as your music files are read, and then a brief
+   print out of the first music file we parse. After that, the script will write
+   out the new database with a second progress bar (though this is usually very
+   quick). After that point, you can run `print_db.py` on the new database to
+   verify that it looks correct. If it does look correct, and things like the
+   paths to the files match what your old database had, you can copy the new
+   database to your Rockbox device, to try it on your device.  I find a reboot
+   of the device after copying is best, just to ensure everything is reloaded
+   correctly.
+
+   Don't worry about there not being small differences in the printed output
+   between the old and new database. Little things, such as the order of songs
+   will almost certainly be different, so the first 30 entries will not be
+   identical. The important thing is that the paths to the files are correct,
+   and that the metadata for each file is correct. If you find any issues with
+   the metadata, please report it as an issue on GitHub, and I will try to
+   fix it.
