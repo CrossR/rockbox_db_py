@@ -30,7 +30,10 @@ There is a few caveats to be aware of, as this is a work in progress:
  - The main `build_db.py` script currently assumes a 1:1 mapping between
    the music files on your device and the files in your music collection.
    - I.e. it assumes that if you have a file at `F:/Music/Artist/Album/Song.mp3`,
-     then that is the same file as `/Music/Artist/Album/Song.mp3` on your device.
+     then that is the same file as `E:/Music/Artist/Album/Song.mp3` on your
+     device.  You can have different parent folders (i.e. `F:/Media/Music` vs
+     `E:/Music/`), but once your music collection starts, the files should be in
+     the same order.
    - If you have a more complex setup, you can potentially make changes to the
      `build_db.py` script to handle that, but you will need to have some
      programmatic way to keep the two in sync.
@@ -104,8 +107,12 @@ Once you have the project setup, the steps are as follows:
    This command takes 3 arguments:
     - The path to your music collection, which will be indexed.
     - The path to the music collection as it should appear in the Rockbox DB.
-      I.e. if when you plugin over USB, your music collection is at "F:/Music",
-      then this should be "/Music/". This is used to make the paths in the DB.
+      I.e. if when you plugin over USB, your music collection is at `F:/Music`,
+      then this should be `/Music/`. This is used to make the paths in the DB.
+      This NEEDS to start with a `/`, and should end with a `/` as well, and
+      shouldn't have any drive letters or whatever in it. Looking at the
+      output from `print_db.py` on your original DB should help you figure
+      out what this should be.
     - The folder where to write the new database to. This should be a folder
       that does not already exist, as it will be created.
     You should see a progress bar as your music files are read, and then a brief
