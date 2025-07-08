@@ -128,7 +128,11 @@ Once you have the project setup, the steps are as follows:
 
    This command takes 3 arguments:
 
-   - The path to your music collection, which will be indexed.
+   - The path to your music collection, which will be indexed. This should be on
+     your computer, NOT on your Rockbox device. You can potentially give it your
+     Rockbox device path...but I've never tested that, so it may not work, and it
+     will be much, much, much slower than indexing your computer. Your HDD / SSD
+     is so much faster, so use that!
    - The path to the music collection as it should appear in the Rockbox DB.
      I.e. if when you plugin over USB, your music collection is at `F:/Music`,
      then this should be `/Music/`. This is used to make the paths in the DB.
