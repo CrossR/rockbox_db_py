@@ -21,6 +21,10 @@ An implementation of the Rockbox database, in Python.
 
 There is a few caveats to be aware of, as this is a work in progress:
 
+ - Rockbox version support is 4.0 ONLY. I've not tested this with any other
+   version, and if you go far enough back and the DB changes (either in spec, or
+   in version number), it WILL not work.
+
  - This is a brand new database every time. You aren't keeping around any of
    your stats, ratings, playtimes etc. from the old database.
    - This is mostly a design choice for now...I use last.fm etc to track those
