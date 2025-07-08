@@ -27,10 +27,10 @@ There is a few caveats to be aware of, as this is a work in progress:
    things, so didn't see the point in trying to keep them around. Some partial
    support may be possible, but I haven't really looked into it yet.
 
- - The main "build_db.py" script currently assumes a 1:1 mapping between
+ - The main `build_db.py` script currently assumes a 1:1 mapping between
    the music files on your device and the files in your music collection.
-   - I.e. it assumes that if you have a file at "F:/Music/Artist/Album/Song.mp3",
-     then that is the same file as "/Music/Artist/Album/Song.mp3" on your device.
+   - I.e. it assumes that if you have a file at `F:/Music/Artist/Album/Song.mp3`,
+     then that is the same file as `/Music/Artist/Album/Song.mp3` on your device.
    - If you have a more complex setup, you can potentially make changes to the
      `build_db.py` script to handle that, but you will need to have some
      programmatic way to keep the two in sync.
