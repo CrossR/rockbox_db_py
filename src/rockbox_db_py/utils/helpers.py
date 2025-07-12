@@ -312,3 +312,59 @@ def build_rockbox_database_from_music_files(
         main_index.add_entry(new_index_entry)
 
     return main_index
+
+def copy_metadata_between_databases(
+    source_db: IndexFile, target_db: IndexFile
+) -> int:
+    """
+    Copies basic metadata from one IndexFile to another.
+    This is useful for transferring metadata like playcounts, ratings, etc.
+
+    Args:
+        source_db: The source IndexFile from which to copy metadata.
+        target_db: The target IndexFile to which metadata will be copied.
+
+    Returns:
+        The number of entries in the target database that did not have a
+        corresponding entry in the source.
+        This may not be an issue, as any new entries in the target will
+        simply not have metadata copied over.
+    """
+
+    # First, build a map for the old database, from music path to IndexFileEntry.
+    old_db_map: Dict[str, IndexFileEntry] = {
+        entry.get_parsed_tag_value(TagTypeEnum.filename): entry
+        for entry in source_db.entries
+    }
+
+    # Now, iterate through the target database entries and copy metadata.
+    missed_count: int = 0
+    for target_entry in target_db.entries:
+        current_filename: str = target_entry.get_parsed_tag_value(
+            TagTypeEnum.filename
+        )
+
+        if current_filename not in old_db_map:
+            missed_count += 1
+            continue
+
+        old_entry: IndexFileEntry = old_db_map[current_filename]
+
+        # Copy over basic metadata fields.
+        target_entry.tag_seek[TagTypeEnum.playcount.value] = (
+            old_entry.tag_seek[TagTypeEnum.playcount.value]
+        )
+        target_entry.tag_seek[TagTypeEnum.rating.value] = (
+            old_entry.tag_seek[TagTypeEnum.rating.value]
+        )
+        target_entry.tag_seek[TagTypeEnum.lastplayed.value] = (
+            old_entry.tag_seek[TagTypeEnum.lastplayed.value]
+        )
+        target_entry.tag_seek[TagTypeEnum.lastelapsed.value] = (
+            old_entry.tag_seek[TagTypeEnum.lastelapsed.value]
+        )
+        target_entry.tag_seek[TagTypeEnum.lastoffset.value] = (
+            old_entry.tag_seek[TagTypeEnum.lastoffset.value]
+        )
+
+    return missed_count

@@ -7,22 +7,40 @@
 # and write the database files to the output directory.
 #
 # Usage:
-#   python build_py.py <input_music_dir> <rockbox_root_music_dir> <output_db_dir> [--stats]
+#   python build_py.py <input_music_dir> <rockbox_root_music_dir>
+#   <output_db_dir> [--stats] [--num_processes <num>] [--genre-file
+#   <genre_file>] [--no-progress]
 #
 #  <input_music_dir> is the path to the directory containing music files to index.
 #  <rockbox_root_music_dir> is the relative path to the music directory in Rockbox.
 #        For example, if your music is in "Music" in the root of the rockbox drive,
 #        you would use "Music" as the relative path.
 #  <output_db_dir> is the path to the directory where the new database files will be written.
+#
+# Optional arguments:
+# --num_processes <num>      Number of processes to use for parsing music files
+#                            (default: all available CPU cores).
+# --genre-file <genre_file>  Path to a genre file for canonicalizing genres.
+#                            The file from Beets is a good start.
+#                            https://raw.githubusercontent.com/beetbox/beets/master/beetsplug/lastgenre/genres-tree.yaml
+#                            Essentially, the given file is used to fold genres up.
+#                            "Industrial Rock" will be canonicalized to "Industrial" etc.
+#                            In cases of multiple genres, all will be, and then the most common
+#                            genre will be used as the canonical genre, or the first.
+# --stats                    After building the database, print statistics by loading the database and printing stats.
+# --no-progress              Disable progress bar when scanning music files.
+# --old-db                   If provided, copy over some of the basic metadata from an old database.
 
 
 import argparse
 import os
 
 from rockbox_db_py.utils.helpers import (
+    load_rockbox_database,
     write_rockbox_database,
     scan_music_directory,
     build_rockbox_database_from_music_files,
+    copy_metadata_between_databases,
 )
 from rockbox_db_py.utils.defs import TagTypeEnum
 
@@ -76,6 +94,11 @@ def parse_args():
         action="store_true",
         help="After building the database, print statistics by loading the database and printing stats.",
     )
+    parser.add_argument(
+        "--old-db",
+        action="store_true",
+        help="If provided, copy over some of the basic metadata from an old database.",
+    )
 
     args = parser.parse_args()
     return args
@@ -121,7 +144,7 @@ def main():
 
     # Build the Rockbox database in memory
     print("Building Rockbox database in memory...")
-    main_index = build_rockbox_database_from_music_files(
+    new_database = build_rockbox_database_from_music_files(
         music_files,
     )
     print("Rockbox database built in memory.")
@@ -133,7 +156,7 @@ def main():
 
         print("Canonicalizing genres in the database...")
         perform_single_genre_canonicalization(
-            main_index,
+            new_database,
             genre_canonical_map,
         )
         print("Genres canonicalized successfully.")
@@ -148,10 +171,22 @@ def main():
     }
     print("Sort map for titles built.")
 
+    # If the old database is provided, copy over some of the basic metadata
+    if args.old_db:
+        print(f"Loading old database from: {args.old_db}")
+        old_db = load_rockbox_database(args.old_db)
+        print("Old database loaded successfully.")
+
+        print("Copying metadata from old database to new database...")
+        missed_entries = copy_metadata_between_databases(old_db, new_database)
+        print("Metadata copied successfully.")
+        print(f"{len(missed_entries)} entries were not found in the old database.")
+        print("Note, this could just be new songs!")
+
     # Write the database to the output directory
     print(f"Writing Rockbox database to: {output_db_dir}")
     write_rockbox_database(
-        main_index, output_db_dir, auto_finalize=True, sort_map=sort_map
+        new_database, output_db_dir, auto_finalize=True, sort_map=sort_map
     )
     print("Rockbox database written successfully.")
 

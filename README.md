@@ -23,19 +23,21 @@ There is a few caveats to be aware of, as this is a work in progress:
 
 - Rockbox version support is 4.0 ONLY. I've not tested this with any other
   version, and if you go far enough back and the DB changes (either in spec, or
-  in version number), it WILL not work.
+  in version number), it WILL NOT work.
 
 - We assume a little endian system, which works fine for iPods. If your device
   isn't an iPod, it may not work. It could be as simple as changing
   `ENDIANNESS_CHAR = "<"` to `ENDIANNESS_CHAR = ">"` in the
   `utils/struct_helpers.py`, but it is not something I've tested.
 
-- This is a brand new database every time. You aren't keeping around any of
-  your stats, ratings, playtimes etc. from the old database.
+- This is a brand new database every time. There is basic copying of the
+  existing database metadata (play counts, ratings, etc.) to the new,
+  but it is not extensively tested, as it isn't something I've kept
+  very much track of in the past.
 
   - This is mostly a design choice for now...I use last.fm etc to track those
-    things, so didn't see the point in trying to keep them around. Some partial
-    support may be possible, but I haven't really looked into it yet.
+    things, so didn't see the point in trying to keep them around, but have
+    added some very basic support to `build_db.py` to copy them over.
 
 - The main `build_db.py` script currently assumes a 1:1 mapping between
   the music files on your device and the files in your music collection.
@@ -143,6 +145,12 @@ Once you have the project setup, the steps are as follows:
    - The folder where to write the new database to. This should be a folder
      that does not already exist, as it will be created, and we will delete
      the contexts of that folder before writing the new database to it.
+   - You can also check the help text for `build_db.py` to see what other
+     options are available, but the above 3 are the most important ones.  Other
+     options include things like whether to copy the existing metadata from the
+     old database, whether to use a progress bar, and "genre" canonicalization,
+     which is useful if you have a lot of different genres and want to reduce the
+     number of entries in the database.
 
    You should see a progress bar as your music files are read, and then a brief
    print out of the first music file we parse. After that, the script will write
@@ -161,3 +169,24 @@ Once you have the project setup, the steps are as follows:
    and that the metadata for each file is correct. If you find any issues with
    the metadata, please report it as an issue on GitHub, and I will try to
    fix it.
+
+
+# TODO / Other Ideas
+
+ - Full GUI, such that you can just select an input / output folder and it
+   will do everything for you. This is a work in progress, and I will
+   probably do this once the core functionality is working well.
+
+ - We can actually insert metadata from other sources...so we could somewhat
+   easily insert last.fm play counts, ratings, etc. into the database, via
+   some API calls.
+
+ - Experiment with further changes to the database, alongside changes to the
+   Rockbox database config file. Much older versions of similar code makes
+   reference to enabling multiple values for some fields (i.e. multiple
+   artists, multiple genres for a song, etc.), which would be
+   interesting to experiment with. This would require changes to the Rockbox
+   user database config file though, to help it filter out the new duplicate
+   entries (or at least I believe that is the the case). This is
+   something I haven't looked into yet, but it would be interesting to
+   experiment with.
