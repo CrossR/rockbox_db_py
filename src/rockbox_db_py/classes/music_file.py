@@ -1,4 +1,8 @@
-# src/rockbox_db_py/classes/music_file.py
+# music_file.py
+#
+# Represents an audio file on the PC filesystem, encapsulating its path,
+# size, modification time, and all parsed metadata tags as raw Python types.
+# This class is designed to be fully picklable for multiprocessing.
 
 from dataclasses import dataclass
 import os
@@ -183,7 +187,7 @@ class MusicFile:
         """
         return "\n".join(
             [
-                f"MusicFile Info:",
+                "MusicFile Info:",
                 f"  Filepath: {self.filepath}",
                 f"  Filesize: {self.filesize} bytes",
                 f"  Modification Time (Unix): {self.modtime_unix}",

@@ -1,4 +1,10 @@
-# File to represent the overall Rockbox index DB file.
+# index_file.py
+#
+# Represents the master index file (database_idx.tcd) from Rockbox.
+# This file contains a collection of IndexFileEntry objects, each linking
+# a specific audio track to its various tag values.
+# It also manages the loading of associated TagFile objects for resolving the
+# other tag data.
 
 import os
 from typing import Optional, List, Dict

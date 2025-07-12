@@ -1,4 +1,8 @@
-# rockbox_db_file_type.py
+# db_file_type.py
+#
+# High-level representation of Rockbox database file types.
+# This enum defines the different types of database files used by Rockbox,
+# including their filenames, magic numbers, and whether they allow duplicates.
 from enum import Enum
 
 from rockbox_db_py.utils.defs import TAG_MAGIC
@@ -13,6 +17,8 @@ class RockboxDBFileType(Enum):
     - `tag_index`: The index of the tag in the database (None for the main index).
     - `magic`: The magic number for the file type, used for validation.
     - `duplicates_possible`: Whether the file type allows duplicate entries.
+                             Some files (like TITLE) allow duplicates,
+                             while others (like ARTIST) do not.
 
     """
 

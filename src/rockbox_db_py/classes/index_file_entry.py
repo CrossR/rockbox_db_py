@@ -1,4 +1,7 @@
-# src/rockbox_db_py/classes/index_file_entry.py
+# index_file_entry.py
+#
+# Represents a single entry in the master index file (database_idx.tcd).
+# Each entry links a specific audio track to its various tag values.
 
 import struct
 from typing import Dict, Optional, List, Union

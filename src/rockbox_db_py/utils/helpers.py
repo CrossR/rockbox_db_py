@@ -1,4 +1,6 @@
-# src/rockbox_db_py/utils/helpers.py
+# helpers.py
+#
+# General utility functions, mostly to help power users of the library.
 
 from multiprocessing import Pool
 import os

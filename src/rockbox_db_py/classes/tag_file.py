@@ -1,4 +1,10 @@
-# src/rockbox_db_py/classes/tag_file.py
+# tag_file.py
+#
+# The represents one of the Rockbox Tag Files (database_X.tcd),
+# which contains a collection of TagFileEntry objects.
+#
+# This class handles reading from and writing to these files,
+# managing their header, and the list of TagFileEntry objects they contain.
 
 import os
 from typing import Optional, List, Dict

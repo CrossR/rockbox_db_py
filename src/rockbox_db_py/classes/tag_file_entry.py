@@ -1,4 +1,8 @@
-# Rockbox Tag File Entry Class
+# tag_file_entry.py
+#
+# Represents a single entry in a Rockbox Tag File (database_X.tcd).
+# Each entry corresponds to a specific tag data (like artist names or song titles)
+# and contains metadata about its position in the file and its unique identifier.
 
 import struct
 import math
