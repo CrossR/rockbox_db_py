@@ -14,5 +14,4 @@ Rockbox database to re-index your music collection.
 # TODO
 
  - Add the DB building functionality, so that it can be run from the GUI
- - Add CI to build this and produce a single portable executable
  - Tidy up the UI and code, check the name etcetc.
