@@ -7,6 +7,7 @@ from tkinter import filedialog
 from src.treeview import TreeViewManager
 from src.workers import WorkerManager
 from src.progress import ProgressManager
+from src.config import UserConfig, get_user_config, save_user_config
 
 
 class SimpleApp:
@@ -21,6 +22,9 @@ class SimpleApp:
         # Initialize managers
         self.worker_manager = WorkerManager(self)
         self.progress_manager = ProgressManager(self)
+
+        # Grab the user config, if it exists
+        self.user_config = get_user_config()
 
         self.create_input_output_frames()
         self.tree_manager = self.create_tabs()
@@ -42,7 +46,7 @@ class SimpleApp:
         tk.Label(input_frame, text="Input").pack(side="left", padx=5)
         self.input_path_entry = tk.Entry(input_frame, width=70)
         self.input_path_entry.pack(side="left", expand=True, fill="x", padx=5)
-        self.input_path_entry.insert(0, "E:\\Media\\Music")
+        self.input_path_entry.insert(0, self.user_config.input_folder)
         tk.Button(input_frame, text="Browse", command=self.select_input_folder).pack(
             side="right", padx=5
         )
@@ -54,7 +58,7 @@ class SimpleApp:
         tk.Label(output_frame, text="Output").pack(side="left", padx=5)
         self.output_path_entry = tk.Entry(output_frame, width=70)
         self.output_path_entry.pack(side="left", expand=True, fill="x", padx=5)
-        self.output_path_entry.insert(0, "F:\\Music")
+        self.output_path_entry.insert(0, self.user_config.output_folder)
         tk.Button(output_frame, text="Browse", command=self.select_output_folder).pack(
             side="right", padx=5
         )
@@ -163,12 +167,16 @@ class SimpleApp:
         if folder_selected:
             self.input_path_entry.delete(0, tk.END)
             self.input_path_entry.insert(0, folder_selected)
+        self.user_config.input_folder = folder_selected
+        save_user_config(self.user_config)
 
     def select_output_folder(self):
         folder_selected = filedialog.askdirectory()
         if folder_selected:
             self.output_path_entry.delete(0, tk.END)
             self.output_path_entry.insert(0, folder_selected)
+        self.user_config.output_folder = folder_selected
+        save_user_config(self.user_config)
 
     # GUI Update Methods
     #
