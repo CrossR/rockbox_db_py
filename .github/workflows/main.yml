@@ -1,0 +1,23 @@
+name: Lint Code with ruff
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  ruff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+
+      - name: Lint DB src
+        uses: astral-sh/ruff-action@v3
+        with:
+          src: "./src"
+
+      - name: Lint tools code
+        uses: astral-sh/ruff-action@v3
+        with:
+          src: "./tools"
