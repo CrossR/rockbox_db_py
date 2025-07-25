@@ -20,15 +20,15 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Install uv
-      uses: astral-sh/setup-uv@6
-      with:
-        version: 'latest'
-
-    - name: Setup Python
-      run: uv python Install
+    - name: Set up Python
+      uses: actions/setup-python@v5
       with:
         python-version-file: ".python-version"
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
+      with:
+        version: 'latest'
 
     - name: Install dependencies
       run: uv sync --locked --all-extras --dev
@@ -39,17 +39,12 @@ jobs:
     - name: Build GUI executable
       run: |
         cd gui
-        uv run pyinstaller main.py
-        uv run pyinstaller \
-          --name "RockBox Sync Helper" \
-          --onefile \
-          --windowed \
-          --noconfirm \
-          main.spec
+        uv run pyinstaller --name "RockBox Sync Helper" --onefile --windowed --noconfirm main.py
+        ls dist/
 
     - name: Upload executable
       uses: actions/upload-artifact@v4
       with:
         name: rockbox-sync-helper-${{ matrix.os }}
-        path: gui/dist/rockbox-sync-helper-${{ matrix.os }}.exe
+        path: gui/dist/*
 
