@@ -3,6 +3,13 @@ import os
 import shutil
 import time
 
+from rockbox_db_py.utils.defs import TagTypeEnum
+from rockbox_db_py.utils.helpers import (
+    scan_music_directory,
+    build_rockbox_database_from_music_files,
+    write_rockbox_database,
+)
+
 from src.db_helpers import get_sync_table, make_sync_table
 from src.file_helpers import (
     build_file_set_from_sync_table,
@@ -86,7 +93,7 @@ def scan_for_files(
     return True
 
 
-def populate_db(output_dir, db_path, progress_callback=None):
+def populate_sync_db(output_dir, db_path, progress_callback=None):
     """
     Populates the database with the current state of the output directory.
     """
@@ -124,7 +131,6 @@ def copy_files(input_path, output_path, overwrite=False, dry_run=False):
                 return False
             time.sleep(0.5)
 
-
     # Copy file from input to output
     try:
         file_exists = os.path.exists(output_path)
@@ -142,3 +148,46 @@ def copy_files(input_path, output_path, overwrite=False, dry_run=False):
         return False
 
     return True
+
+
+def populate_rockbox_db(
+    music_folder: str, rockbox_output_folder: str, progress_callback: callable = None
+):
+    """
+    Populates the Rockbox database with the current state of the output folder.
+
+    This had 3 main steps:
+        1. Scan the input music folder, loading all the music file tags.
+        2. Build an in-memory rockbox compatible database.
+        3. Write the database to the rockbox output folder.
+    """
+    print(
+        f"Populating Rockbox DB at {rockbox_output_folder} with files from {music_folder}"
+    )
+
+    progress_callback("message", "Processing music files...")
+    music_files = scan_music_directory(
+        music_folder, show_progress=False, custom_progress_callback=progress_callback
+    )
+    progress_callback("message", f"Found {len(music_files)} music files.")
+
+    if not music_files:
+        progress_callback("message", "No music files found to index. Exiting.")
+        return
+
+    progress_callback("message", "Building Rockbox database...")
+    new_database = build_rockbox_database_from_music_files(music_files)
+    progress_callback("message", "Rockbox database built in memory.")
+
+    # Build a sort map, to ensure consistent sorting of entries
+    progress_callback("message", "Building sort map for database entries...")
+    sort_map = {TagTypeEnum.title: {}}
+    sort_map[TagTypeEnum.title] = {
+        mf.title: mf.filepath for mf in music_files if mf.title
+    }
+
+    progress_callback("message", "Writing Rockbox database to disk...")
+    write_rockbox_database(new_database, rockbox_output_folder)
+    progress_callback("message", "Rockbox database written to disk!")
+
+    print("Rockbox database has been updated!")
