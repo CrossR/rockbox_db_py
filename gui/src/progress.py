@@ -59,8 +59,7 @@ class ProgressManager:
             # Calculate elapsed time since start
             elapsed = current_time - self.start_time
 
-            # Calculate time since last progress update
-            time_delta = current_time - self.last_progress_time
+            # Calculate the progress delta
             progress_delta = progress - self.last_progress
 
             # Only update if we have a meaningful progress change to reduce

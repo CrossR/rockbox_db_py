@@ -7,7 +7,7 @@ from tkinter import filedialog
 from src.treeview import TreeViewManager
 from src.workers import WorkerManager
 from src.progress import ProgressManager
-from src.config import UserConfig, get_user_config, save_user_config
+from src.config import get_user_config, save_user_config
 
 
 class SimpleApp:

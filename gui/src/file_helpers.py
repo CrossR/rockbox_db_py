@@ -132,7 +132,7 @@ def populate_db_with_current_state(
     sync_table: List[Dict[str, Any]] = get_sync_table(db_path)
 
     if len(sync_table) == 0:
-        print(f"No entries found in the sync table. Populating...")
+        print("No entries found in the sync table. Populating...")
         records = [
             {"path": file.path, "size": file.size, "mod_time": file.mod_time}
             for file in output_files.values()
