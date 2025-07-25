@@ -14,7 +14,7 @@ class SimpleApp:
     def __init__(self, root):
         self.root = root
         self.root.title("RockBox Sync Helper")
-        self.root.geometry("600x800")
+        self.root.geometry("800x900")
 
         # Create a queue for thread-safe communication
         self.queue = queue.Queue()
@@ -43,7 +43,7 @@ class SimpleApp:
         input_frame = tk.Frame(self.root, bd=2, relief="groove")
         input_frame.pack(pady=10, padx=10, fill="x")
 
-        tk.Label(input_frame, text="Input").pack(side="left", padx=5)
+        tk.Label(input_frame, text="Input Music Folder").pack(side="left", padx=5)
         self.input_path_entry = tk.Entry(input_frame, width=70)
         self.input_path_entry.pack(side="left", expand=True, fill="x", padx=5)
         self.input_path_entry.insert(0, self.user_config.input_folder)
@@ -55,11 +55,23 @@ class SimpleApp:
         output_frame = tk.Frame(self.root, bd=2, relief="groove")
         output_frame.pack(pady=5, padx=10, fill="x")
 
-        tk.Label(output_frame, text="Output").pack(side="left", padx=5)
+        tk.Label(output_frame, text="Output Music Folder").pack(side="left", padx=5)
         self.output_path_entry = tk.Entry(output_frame, width=70)
         self.output_path_entry.pack(side="left", expand=True, fill="x", padx=5)
         self.output_path_entry.insert(0, self.user_config.output_folder)
         tk.Button(output_frame, text="Browse", command=self.select_output_folder).pack(
+            side="right", padx=5
+        )
+
+        # Rockbox DB File Frame
+        db_frame = tk.Frame(self.root, bd=2, relief="groove")
+        db_frame.pack(pady=5, padx=10, fill="x")
+
+        tk.Label(db_frame, text="Rockbox Folder").pack(side="left", padx=5)
+        self.db_path_entry = tk.Entry(db_frame, width=70)
+        self.db_path_entry.pack(side="left", expand=True, fill="x", padx=5)
+        self.db_path_entry.insert(0, self.user_config.db_file)
+        tk.Button(db_frame, text="Browse", command=self.select_db_file).pack(
             side="right", padx=5
         )
 
@@ -176,6 +188,14 @@ class SimpleApp:
             self.output_path_entry.delete(0, tk.END)
             self.output_path_entry.insert(0, folder_selected)
         self.user_config.output_folder = folder_selected
+        save_user_config(self.user_config)
+
+    def select_db_file(self):
+        folder_selected = filedialog.askdirectory()
+        if folder_selected:
+            self.db_path_entry.delete(0, tk.END)
+            self.db_path_entry.insert(0, folder_selected)
+        self.user_config.db_file = folder_selected
         save_user_config(self.user_config)
 
     # GUI Update Methods
