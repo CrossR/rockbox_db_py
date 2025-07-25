@@ -68,9 +68,9 @@ class SimpleApp:
         db_frame.pack(pady=5, padx=10, fill="x")
 
         tk.Label(db_frame, text="Rockbox Folder").pack(side="left", padx=5)
-        self.db_path_entry = tk.Entry(db_frame, width=70)
-        self.db_path_entry.pack(side="left", expand=True, fill="x", padx=5)
-        self.db_path_entry.insert(0, self.user_config.db_file)
+        self.rockbox_db_path_entry = tk.Entry(db_frame, width=70)
+        self.rockbox_db_path_entry.pack(side="left", expand=True, fill="x", padx=5)
+        self.rockbox_db_path_entry.insert(0, self.user_config.db_file)
         tk.Button(db_frame, text="Browse", command=self.select_db_file).pack(
             side="right", padx=5
         )
@@ -161,12 +161,19 @@ class SimpleApp:
         )
         self.apply_updates_button.pack(side="left", padx=10)
 
-        self.populate_db_button = tk.Button(
+        self.verify_device_files_button = tk.Button(
             button_frame,
-            text="Populate DB",
-            command=self.worker_manager.start_populate_db,
+            text="Verify Device Files",
+            command=self.worker_manager.verify_device_files,
         )
-        self.populate_db_button.pack(side="left", padx=10)
+        self.verify_device_files_button.pack(side="left", padx=10)
+
+        self.build_rockbox_db_button = tk.Button(
+            button_frame,
+            text="Build Rockbox DB",
+            command=self.worker_manager.build_rockbox_db,
+        )
+        self.build_rockbox_db_button.pack(side="left", padx=10)
 
         self.clear_all_trees_button = tk.Button(
             button_frame, text="Clear Tree", command=self.tree_manager.clear_all_trees
@@ -193,8 +200,8 @@ class SimpleApp:
     def select_db_file(self):
         folder_selected = filedialog.askdirectory()
         if folder_selected:
-            self.db_path_entry.delete(0, tk.END)
-            self.db_path_entry.insert(0, folder_selected)
+            self.rockbox_db_path_entry.delete(0, tk.END)
+            self.rockbox_db_path_entry.insert(0, folder_selected)
         self.user_config.db_file = folder_selected
         save_user_config(self.user_config)
 
@@ -221,7 +228,8 @@ class SimpleApp:
         """Disables all buttons to prevent re-clicks during long operations."""
         self.load_lists_button.config(state=tk.DISABLED)
         self.apply_updates_button.config(state=tk.DISABLED)
-        self.populate_db_button.config(state=tk.DISABLED)
+        self.verify_device_files_button.config(state=tk.DISABLED)
+        self.build_rockbox_db_button.config(state=tk.DISABLED)
         self.clear_all_trees_button.config(state=tk.DISABLED)
 
     def start_time_estimation(self):
@@ -232,7 +240,8 @@ class SimpleApp:
     def on_worker_finished_gui(self):
         """Called when a worker thread signals completion."""
         self.load_lists_button.config(state=tk.NORMAL)
-        self.populate_db_button.config(state=tk.NORMAL)
+        self.verify_device_files_button.config(state=tk.NORMAL)
+        self.build_rockbox_db_button.config(state=tk.NORMAL)
         self.clear_all_trees_button.config(state=tk.NORMAL)
 
         # Enable the refresh button if there is data in the lists
