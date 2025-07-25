@@ -22,6 +22,7 @@ from src.file_helpers import (
 def scan_for_files(
     input_dir,
     output_dir,
+    user_config,
     add_callback=None,
     update_callback=None,
     delete_callback=None,
@@ -37,15 +38,16 @@ def scan_for_files(
     if progress_callback:
         progress_callback("clear_all_lists")
 
-    # TODO: Replace with user loaded config
-    DB_PATH = os.path.join(output_dir, ".sync", "sync_helper.db")
+    # Use the user config to determine the database path
+    db_folder = user_config.sync_db_path
+    db_path = os.path.join(output_dir, db_folder)
 
     # Get the sync table
-    make_sync_table(DB_PATH)
-    sync_table = get_sync_table(DB_PATH)
+    make_sync_table(db_path)
+    sync_table = get_sync_table(db_path)
 
     # Get both file sets
-    input_file_set = build_file_set(input_dir)
+    input_file_set = build_file_set(input_dir, user_config.extensions_to_track)
     output_file_set = build_file_set_from_sync_table(sync_table, output_dir)
 
     # Find the differences between the two states

@@ -2,7 +2,7 @@
 import os
 import json
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 # Which file extensions to track for syncing
 FILES_TO_TRACK = [
@@ -20,6 +20,8 @@ class UserConfig:
     input_folder: str = ""
     output_folder: str = ""
     db_file: str = ""
+    extensions_to_track: list[str] = field(default_factory=lambda: FILES_TO_TRACK)
+    sync_db_path: str = ".sync/sync_helper.db"
 
 def get_config_path() -> str:
     """

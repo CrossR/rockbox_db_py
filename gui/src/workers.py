@@ -223,6 +223,7 @@ class WorkerManager:
             scan_for_files(
                 input_folder,
                 output_folder,
+                self.parent_app.user_config,
                 add_callback=lambda f: list_and_progress_callback("add", f),
                 update_callback=lambda f: list_and_progress_callback("update", f),
                 delete_callback=lambda f: list_and_progress_callback("delete", f),

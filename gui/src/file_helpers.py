@@ -83,13 +83,13 @@ def find_file_differences(input_files_set, output_files_set):
     return files_to_add, files_to_update, files_to_delete
 
 
-def build_file_set(folder_path, log_func=print):
+def build_file_set(folder_path, extensions, log_func=print):
     """Build a dictionary of files keyed by normalized path"""
     log_func(f"Building file list from folder: {folder_path}")
     files = []
     for root, _, filenames in os.walk(folder_path):
         for filename in filenames:
-            if filename.endswith(tuple(FILES_TO_TRACK)):
+            if filename.endswith(tuple(extensions)):
                 file_path = os.path.join(root, filename)
                 try:
                     files.append(File(file_path))
@@ -114,7 +114,7 @@ def build_file_set_from_sync_table(sync_table, output_folder, log_func=print):
 
 
 def populate_db_with_current_state(
-    output_folder: str, db_path: str, progress_callback=None
+    output_folder: str, user_config, progress_callback=None
 ):
     """
     Sync the state of the output folder to the database.
@@ -122,13 +122,13 @@ def populate_db_with_current_state(
          If there is a DB, load it and update it with the current state of the output folder.
 
     :param output_folder: Path to the output folder.
-    :param db_path: Path to the SQLite database file.
+    :param user_config: User configuration object containing database path.
     """
-
-    # Get the current state of the output folder
-    output_files = build_file_set(output_folder)
+    output_files = build_file_set(output_folder, user_config.extensions_to_track)
 
     # Load the sync table from the database
+    db_folder = user_config.sync_db_path
+    db_path = os.path.join(output_folder, db_folder)
     sync_table: List[Dict[str, Any]] = get_sync_table(db_path)
 
     if len(sync_table) == 0:
