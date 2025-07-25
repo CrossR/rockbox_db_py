@@ -263,7 +263,7 @@ class WorkerManager:
 
             populate_sync_db(
                 output_folder,
-                db_path=os.path.join(output_folder, ".sync", "sync_helper.db"),
+                self.parent_app.user_config,
                 progress_callback=lambda p: self.parent_app.queue.put(("progress", p)),
             )
 

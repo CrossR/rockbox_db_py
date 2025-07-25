@@ -96,17 +96,21 @@ def scan_for_files(
     return True
 
 
-def populate_sync_db(output_dir, db_path, progress_callback=None):
+def populate_sync_db(output_dir, user_config, progress_callback=None):
     """
     Populates the database with the current state of the output directory.
     """
+
+    db_folder = user_config.sync_db_path
+    db_path = os.path.join(output_dir, db_folder)
+
     print(f"Populating database at {db_path} with files from {output_dir}")
 
     # Ensure the sync table exists
     make_sync_table(db_path)
 
     # Scan the output directory and update the database
-    populate_db_with_current_state(output_dir, db_path, progress_callback)
+    populate_db_with_current_state(output_dir, user_config, progress_callback)
 
     print("Database populated with current state of output folder.")
 
