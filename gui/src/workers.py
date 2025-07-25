@@ -169,8 +169,13 @@ class WorkerManager:
             BATCH_SIZE = 500
             FLUSH_INTERVAL = 1.0 # seconds
 
+            files_to_add = 0
+            files_to_update = 0
+            files_to_delete = 0
+
             def flush_batches(force: bool = False):
                 nonlocal add_batch, update_batch, delete_batch, last_flush
+                nonlocal files_to_add, files_to_update, files_to_delete
 
                 if (
                     force or
@@ -181,12 +186,15 @@ class WorkerManager:
                 ):
                     if add_batch:
                         self.parent_app.queue.put(("add_to_tree", ("add", list(add_batch))))
+                        files_to_add += len(add_batch)
                         add_batch = []
                     if update_batch:
                         self.parent_app.queue.put(("add_to_tree", ("update", list(update_batch))))
+                        files_to_update += len(update_batch)
                         update_batch = []
                     if delete_batch:
                         self.parent_app.queue.put(("add_to_tree", ("delete", list(delete_batch))))
+                        files_to_delete += len(delete_batch)
                         delete_batch = []
                     last_flush = time.time()
 
@@ -220,6 +228,8 @@ class WorkerManager:
                 return
 
             self.parent_app.queue.put(("message", "Scanning for files..."))
+            self.parent_app.queue.put(("message", "This isn't loading tags etc...so is quick"))
+            self.parent_app.queue.put(("message", "Loading the files for building the DB will come later!"))
             scan_for_files(
                 input_folder,
                 output_folder,
@@ -232,6 +242,11 @@ class WorkerManager:
             flush_batches(force=True)  # Ensure all batches are flushed
 
             self.parent_app.queue.put(("message", "Music files found!"))
+            self.parent_app.queue.put(
+                ("message", f"Files to add: {files_to_add}, "
+                            f"Files to update: {files_to_update}, "
+                            f"Files to delete: {files_to_delete}")
+            )
         except Exception as e:
             self.parent_app.queue.put(
                 ("error", f"An error occurred during list refresh: {e}")
@@ -299,6 +314,8 @@ class WorkerManager:
                 elif msg_type == "message":
                     self.parent_app.queue.put(("message", data))
 
+            self.parent_app.queue.put(("message", "Processing music files for Rockbox database..."))
+            self.parent_app.queue.put(("message", "This has to load all the file tags, so may take a few seconds..."))
             # Call the rockbox database building logic
             # This will deal with all the required steps to scan, build and write the database
             populate_rockbox_db(
