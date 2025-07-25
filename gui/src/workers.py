@@ -5,7 +5,7 @@ from typing import Optional
 from tkinter import messagebox
 
 # Import your external logic
-from src.logic import scan_for_files, populate_db, copy_files
+from src.logic import scan_for_files, populate_sync_db, copy_files, populate_rockbox_db
 
 
 class WorkerManager:
@@ -141,7 +141,7 @@ class WorkerManager:
 
                 # Update the DB to reflect the current state
                 self.parent_app.queue.put(("message", "Complete! Updating database..."))
-                self._worker_populate_db()
+                self._worker_verify_device_files()
 
             # Notify the user that the operation is complete
             if dry_run:
@@ -204,8 +204,15 @@ class WorkerManager:
         finally:
             self.parent_app.queue.put(("done", None))
 
-    def _worker_populate_db(self) -> None:
-        """This function runs in a separate thread to populate the database."""
+    def _worker_verify_device_files(self) -> None:
+        """
+        This function runs in a separate thread to verify device files.
+        By that, we mean it syncs the state of the on-device files with the
+        on-device, sync database.
+
+        This does not modify the Rockbox database at all, it only
+        updates the local sync database with the current state of the device.
+        """
         try:
             input_folder = self.parent_app.input_path_entry.get()
             output_folder = self.parent_app.output_path_entry.get()
@@ -219,7 +226,7 @@ class WorkerManager:
                 )
                 return
 
-            populate_db(
+            populate_sync_db(
                 output_folder,
                 db_path=os.path.join(output_folder, ".sync", "sync_helper.db"),
                 progress_callback=lambda p: self.parent_app.queue.put(("progress", p)),
@@ -227,6 +234,49 @@ class WorkerManager:
 
             self.parent_app.queue.put(
                 ("message", "Database populated with current state of output folder.")
+            )
+        except Exception as e:
+            self.parent_app.queue.put(
+                ("error", f"An error occurred while populating the database: {e}")
+            )
+        finally:
+            self.parent_app.queue.put(("done", None))
+
+    def _worker_build_rockbox_db(self) -> None:
+        """This function runs in a separate thread to build the Rockbox database."""
+        try:
+            input_folder = self.parent_app.input_path_entry.get()
+            rockbox_output_folder = self.parent_app.rockbox_db_path_entry.get()
+
+            if not input_folder or not rockbox_output_folder:
+                self.parent_app.queue.put(
+                    (
+                        "error",
+                        "Please select both the input folder, and the Rockbox DB output folder.",
+                    )
+                )
+                return
+
+            # Define a progress callback to update the GUI
+            def progress_callback(msg_type: str, data: Optional[str] = None):
+                if msg_type == "progress":
+                    self.parent_app.queue.put(("progress", data))
+                elif msg_type == "message":
+                    self.parent_app.queue.put(("message", data))
+
+            # Call the rockbox database building logic
+            # This will deal with all the required steps to scan, build and write the database
+            populate_rockbox_db(
+                music_folder=input_folder,
+                rockbox_output_folder=rockbox_output_folder,
+                progress_callback=progress_callback,
+            )
+
+            self.parent_app.queue.put(
+                (
+                    "message",
+                    "Rockbox database files populated with current state of music files.",
+                )
             )
         except Exception as e:
             self.parent_app.queue.put(
@@ -250,8 +300,8 @@ class WorkerManager:
         self.parent_app.progress_manager.start_time_estimation()
         threading.Thread(target=self._worker_refresh_lists, daemon=True).start()
 
-    def start_populate_db(self) -> None:
-        """Starts the database population in a separate thread."""
+    def verify_device_files(self) -> None:
+        """Starts the process of verifying device files in a separate thread."""
         if self.worker_running:
             self.parent_app.log_message(
                 "Another operation is already in progress.", "warning"
@@ -262,7 +312,21 @@ class WorkerManager:
         self.parent_app.tree_manager.clear_all_trees()
         self.parent_app.disable_all_buttons()
         self.parent_app.progress_manager.reset_progress()
-        threading.Thread(target=self._worker_populate_db, daemon=True).start()
+        threading.Thread(target=self._worker_verify_device_files, daemon=True).start()
+
+    def build_rockbox_db(self) -> None:
+        """Starts the process of building a final Rockbox database in a separate thread."""
+        if self.worker_running:
+            self.parent_app.log_message(
+                "Another operation is already in progress.", "warning"
+            )
+            return
+
+        self.worker_running = True
+        self.parent_app.tree_manager.clear_all_trees()
+        self.parent_app.disable_all_buttons()
+        self.parent_app.progress_manager.reset_progress()
+        threading.Thread(target=self._worker_build_rockbox_db, daemon=True).start()
 
     def start_apply_changes(self) -> None:
         """Starts the file copy/sync operations in a separate thread."""
