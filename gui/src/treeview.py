@@ -57,7 +57,22 @@ class TreeViewManager:
         tree.pack(expand=True, fill="both")
         return tree
 
-    def add_to_treeview(self, tree, file_path, size=0):
+    def add_to_treeview(self, tree, file_path: str | list[str], size=0):
+        if isinstance(file_path, list):
+            # If a list is provided, add each file in the list
+            # Since we are assuming adding lots of things...
+            # Pause redrawing, and don't bother updating the title
+            # util the end.
+            tree.pack_forget()  # Hide the treeview during bulk insert
+            for path in file_path:
+                self.add_item(tree, path, size, update_titles=False)
+            tree.pack(expand=True, fill="both")
+            self.update_tab_titles()
+        else:
+            # Otherwise, add a single file path
+            self.add_item(tree, file_path, size)
+
+    def add_item(self, tree, file_path, size=0, update_titles=True):
         """Add a file path to a treeview with proper hierarchy, removing input/output prefixes"""
         # Get input and output folders from parent app
         input_folder = os.path.normpath(self.parent_app.input_path_entry.get())
@@ -133,7 +148,8 @@ class TreeViewManager:
                 tree.item(root_id, open=True)
 
         # Finally, update the tab titles to reflect the new item
-        self.update_tab_titles()
+        if update_titles:
+            self.update_tab_titles()
 
     def clear_treeview(self, tree):
         """Clear all items from a treeview"""

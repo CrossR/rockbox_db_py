@@ -1,10 +1,10 @@
 import concurrent.futures
 import os
 import threading
+import time
 from typing import Optional
 from tkinter import messagebox
 
-# Import your external logic
 from src.logic import scan_for_files, populate_sync_db, copy_files, populate_rockbox_db
 
 
@@ -160,17 +160,50 @@ class WorkerManager:
     def _worker_refresh_lists(self) -> None:
         """This function runs in a separate thread to populate treeviews."""
         try:
+
+            # There can sometimes be a giant number of files to process,
+            # where putting all the items in the queue one by one could be inefficient.
+            # Instead, we can batch the items and put them in the queue in chunks.
+            add_batch, update_batch, delete_batch = [], [], []
+            last_flush = time.time()
+            BATCH_SIZE = 500
+            FLUSH_INTERVAL = 1.0 # seconds
+
+            def flush_batches(force: bool = False):
+                nonlocal add_batch, update_batch, delete_batch, last_flush
+
+                if (
+                    force or
+                    len(add_batch) >= BATCH_SIZE or
+                    len(update_batch) >= BATCH_SIZE or
+                    len(delete_batch) >= BATCH_SIZE or
+                    (time.time() - last_flush) >= FLUSH_INTERVAL
+                ):
+                    if add_batch:
+                        self.parent_app.queue.put(("add_to_tree", ("add", list(add_batch))))
+                        add_batch = []
+                    if update_batch:
+                        self.parent_app.queue.put(("add_to_tree", ("update", list(update_batch))))
+                        update_batch = []
+                    if delete_batch:
+                        self.parent_app.queue.put(("add_to_tree", ("delete", list(delete_batch))))
+                        delete_batch = []
+                    last_flush = time.time()
+
             # Pass a callback to the external scan_for_files function
             def list_and_progress_callback(msg_type: str, data: Optional[str] = None):
                 """Internal callback for scan_for_files."""
                 if msg_type == "clear_all_lists":
                     self.parent_app.queue.put(("clear_all_trees_gui", None))
                 elif msg_type == "add":
-                    self.parent_app.queue.put(("add_to_tree", ("add", data)))
+                    add_batch.append(data)
+                    flush_batches()
                 elif msg_type == "update":
-                    self.parent_app.queue.put(("add_to_tree", ("update", data)))
+                    update_batch.append(data)
+                    flush_batches()
                 elif msg_type == "delete":
-                    self.parent_app.queue.put(("add_to_tree", ("delete", data)))
+                    delete_batch.append(data)
+                    flush_batches()
                 elif msg_type == "progress":
                     self.parent_app.queue.put(("progress", data))
 
@@ -186,7 +219,7 @@ class WorkerManager:
                 )
                 return
 
-            # Call your actual scan logic, passing the callback
+            self.parent_app.queue.put(("message", "Scanning for files..."))
             scan_for_files(
                 input_folder,
                 output_folder,
@@ -195,8 +228,9 @@ class WorkerManager:
                 delete_callback=lambda f: list_and_progress_callback("delete", f),
                 progress_callback=list_and_progress_callback,
             )
+            flush_batches(force=True)  # Ensure all batches are flushed
 
-            self.parent_app.queue.put(("message", "Lists refreshed!"))
+            self.parent_app.queue.put(("message", "Music files found!"))
         except Exception as e:
             self.parent_app.queue.put(
                 ("error", f"An error occurred during list refresh: {e}")
