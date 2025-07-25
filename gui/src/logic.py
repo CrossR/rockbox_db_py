@@ -41,6 +41,7 @@ def scan_for_files(
     DB_PATH = os.path.join(output_dir, ".sync", "sync_helper.db")
 
     # Get the sync table
+    make_sync_table(DB_PATH)
     sync_table = get_sync_table(DB_PATH)
 
     # Get both file sets
