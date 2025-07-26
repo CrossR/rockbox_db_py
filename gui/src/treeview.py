@@ -72,6 +72,23 @@ class TreeViewManager:
             # Otherwise, add a single file path
             self.add_item(tree, file_path, size)
 
+    def remove_from_treeview(self, tree, file_path: str):
+        """Remove a file path from a treeview"""
+        # Normalize the file path
+        file_path = os.path.normpath(file_path)
+
+        # Find the item in the treeview
+        for item_id in tree.get_children():
+            values = tree.item(item_id, "values")
+
+            if values and values[0] == file_path:
+                # If we found the item, delete it
+                tree.delete(item_id)
+                break
+
+        # Update tab titles after removal
+        self.update_tab_titles()
+
     def add_item(self, tree, file_path, size=0, update_titles=True):
         """Add a file path to a treeview with proper hierarchy, removing input/output prefixes"""
         # Get input and output folders from parent app

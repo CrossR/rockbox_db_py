@@ -14,5 +14,3 @@ Rockbox database to re-index your music collection.
 # TODO
 
  - Tidy up the UI and code, check the name etcetc.
- - Update the treeviews as files are moving, so you can more directly see the progress.
- - Is there any reason we can't sync and build the database at the same time?

@@ -292,6 +292,18 @@ class SimpleApp:
                         self.tree_manager.add_to_treeview(self.update_tree, file_path)
                     elif list_type == "delete":
                         self.tree_manager.add_to_treeview(self.delete_tree, file_path)
+                elif msg_type == "remove_from_tree":
+                    list_type, file_path = data
+                    if list_type == "add":
+                        self.tree_manager.remove_from_treeview(self.add_tree, file_path)
+                    elif list_type == "update":
+                        self.tree_manager.remove_from_treeview(
+                            self.update_tree, file_path
+                        )
+                    elif list_type == "delete":
+                        self.tree_manager.remove_from_treeview(
+                            self.delete_tree, file_path
+                        )
                 elif msg_type == "clear_all_trees_gui":
                     self.tree_manager.clear_all_trees()
                 elif msg_type == "done":

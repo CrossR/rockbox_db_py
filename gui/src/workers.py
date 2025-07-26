@@ -69,8 +69,10 @@ class WorkerManager:
             processed_files = 0
             progress_lock = threading.Lock()
 
-            def update_progress():
-                nonlocal processed_files
+            def update_progress(
+                update_type: Optional[str] = None, file_path: Optional[str] = None
+            ):
+                nonlocal processed_files, dry_run
                 with progress_lock:
                     processed_files += 1
                     progress = (
@@ -79,6 +81,11 @@ class WorkerManager:
                         else 100
                     )
                     self.parent_app.queue.put(("progress", progress))
+                # If we aren't in dry run mode, remove the file from the tree
+                if update_type and file_path and not dry_run:
+                    self.parent_app.queue.put(
+                        ("remove_from_tree", (update_type, file_path))
+                    )
 
             # Function for copy operations to run in thread pool
             def copy_file_task(file_path: str, overwrite: bool = False):
@@ -96,7 +103,7 @@ class WorkerManager:
                                 f"Failed to {'update' if overwrite else 'copy'} {file_path}",
                             )
                         )
-                    update_progress()
+                    update_progress(file_path)
                 except Exception as e:
                     self.parent_app.queue.put(
                         ("error", f"Error processing {file_path}: {e}")
@@ -111,7 +118,7 @@ class WorkerManager:
                         print(f"Would delete {full_path} (dry run)")
                     else:
                         os.remove(full_path)
-                    update_progress()
+                    update_progress(file_path)
                 except Exception as e:
                     self.parent_app.queue.put(
                         ("error", f"Failed to delete {file_path}: {e}")
