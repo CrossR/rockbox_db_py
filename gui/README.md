@@ -13,5 +13,5 @@ Rockbox database to re-index your music collection.
 
 # TODO
 
- - Add the DB building functionality, so that it can be run from the GUI
  - Tidy up the UI and code, check the name etcetc.
+ - Update the treeviews as files are moving, so you can more directly see the progress.

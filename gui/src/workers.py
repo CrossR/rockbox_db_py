@@ -46,6 +46,22 @@ class WorkerManager:
                 ("message", f"Using {max_workers} parallel workers for file operations")
             )
 
+            self.parent_app.queue.put(
+                (
+                    "message",
+                    "Starting file operations... "
+                    "This may take a while depending on the number of files.",
+                )
+            )
+
+            self.parent_app.queue.put(
+                (
+                    "message",
+                    "On most older devices, we are simply IO bound, so don't be"
+                    "alarmed by the low number of workers.",
+                )
+            )
+
             # Track progress across all operations
             total_files = (
                 len(files_to_copy) + len(files_to_update) + len(files_to_delete)
@@ -167,7 +183,7 @@ class WorkerManager:
             add_batch, update_batch, delete_batch = [], [], []
             last_flush = time.time()
             BATCH_SIZE = 500
-            FLUSH_INTERVAL = 1.0 # seconds
+            FLUSH_INTERVAL = 1.0  # seconds
 
             files_to_add = 0
             files_to_update = 0
@@ -178,22 +194,28 @@ class WorkerManager:
                 nonlocal files_to_add, files_to_update, files_to_delete
 
                 if (
-                    force or
-                    len(add_batch) >= BATCH_SIZE or
-                    len(update_batch) >= BATCH_SIZE or
-                    len(delete_batch) >= BATCH_SIZE or
-                    (time.time() - last_flush) >= FLUSH_INTERVAL
+                    force
+                    or len(add_batch) >= BATCH_SIZE
+                    or len(update_batch) >= BATCH_SIZE
+                    or len(delete_batch) >= BATCH_SIZE
+                    or (time.time() - last_flush) >= FLUSH_INTERVAL
                 ):
                     if add_batch:
-                        self.parent_app.queue.put(("add_to_tree", ("add", list(add_batch))))
+                        self.parent_app.queue.put(
+                            ("add_to_tree", ("add", list(add_batch)))
+                        )
                         files_to_add += len(add_batch)
                         add_batch = []
                     if update_batch:
-                        self.parent_app.queue.put(("add_to_tree", ("update", list(update_batch))))
+                        self.parent_app.queue.put(
+                            ("add_to_tree", ("update", list(update_batch)))
+                        )
                         files_to_update += len(update_batch)
                         update_batch = []
                     if delete_batch:
-                        self.parent_app.queue.put(("add_to_tree", ("delete", list(delete_batch))))
+                        self.parent_app.queue.put(
+                            ("add_to_tree", ("delete", list(delete_batch)))
+                        )
                         files_to_delete += len(delete_batch)
                         delete_batch = []
                     last_flush = time.time()
@@ -228,8 +250,6 @@ class WorkerManager:
                 return
 
             self.parent_app.queue.put(("message", "Scanning for files..."))
-            self.parent_app.queue.put(("message", "This isn't loading tags etc...so is quick"))
-            self.parent_app.queue.put(("message", "Loading the files for building the DB will come later!"))
             scan_for_files(
                 input_folder,
                 output_folder,
@@ -239,13 +259,16 @@ class WorkerManager:
                 delete_callback=lambda f: list_and_progress_callback("delete", f),
                 progress_callback=list_and_progress_callback,
             )
-            flush_batches(force=True)  # Ensure all batches are flushed
+            flush_batches(force=True)
 
             self.parent_app.queue.put(("message", "Music files found!"))
             self.parent_app.queue.put(
-                ("message", f"Files to add: {files_to_add}, "
-                            f"Files to update: {files_to_update}, "
-                            f"Files to delete: {files_to_delete}")
+                (
+                    "message",
+                    f"Files to add: {files_to_add}, "
+                    f"Files to update: {files_to_update}, "
+                    f"Files to delete: {files_to_delete}",
+                )
             )
         except Exception as e:
             self.parent_app.queue.put(
@@ -314,8 +337,15 @@ class WorkerManager:
                 elif msg_type == "message":
                     self.parent_app.queue.put(("message", data))
 
-            self.parent_app.queue.put(("message", "Processing music files for Rockbox database..."))
-            self.parent_app.queue.put(("message", "This has to load all the file tags, so may take a few seconds..."))
+            self.parent_app.queue.put(
+                ("message", "Processing music files for Rockbox database...")
+            )
+            self.parent_app.queue.put(
+                (
+                    "message",
+                    "This has to load all the file tags, so may take a few seconds...",
+                )
+            )
             # Call the rockbox database building logic
             # This will deal with all the required steps to scan, build and write the database
             populate_rockbox_db(
