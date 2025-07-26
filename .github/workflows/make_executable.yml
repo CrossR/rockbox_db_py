@@ -39,7 +39,7 @@ jobs:
     - name: Build GUI executable
       run: |
         cd gui
-        uv run pyinstaller --name "RockBox Sync Helper" --onefile --windowed --noconfirm main.py
+        uv run pyinstaller --name "RockBox Sync Helper" --onedir --windowed --noconfirm main.py
         ls dist/
 
     - name: Upload executable
