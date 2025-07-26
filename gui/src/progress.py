@@ -52,6 +52,9 @@ class ProgressManager:
         if not self.time_label:
             return
 
+        if self.start_time == 0:
+            self.start_time_estimation()
+
         current_time = time.time()
 
         # Only update estimate if progress has actually changed

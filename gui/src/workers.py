@@ -407,6 +407,7 @@ class WorkerManager:
         self.parent_app.tree_manager.clear_all_trees()
         self.parent_app.disable_all_buttons()
         self.parent_app.progress_manager.reset_progress()
+        self.parent_app.progress_manager.start_time_estimation()
         threading.Thread(target=self._worker_build_rockbox_db, daemon=True).start()
 
     def start_apply_changes(self) -> None:
