@@ -3,6 +3,7 @@
 import os
 from typing import Optional
 
+
 class File:
     """
     Represents a file with its path and size.
@@ -33,4 +34,3 @@ class File:
 
     def __repr__(self):
         return f"File(path={self.path}, size={self.size}, mod_time={self.mod_time})"
-

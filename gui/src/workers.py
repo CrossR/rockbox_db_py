@@ -176,7 +176,6 @@ class WorkerManager:
     def _worker_refresh_lists(self) -> None:
         """This function runs in a separate thread to populate treeviews."""
         try:
-
             # There can sometimes be a giant number of files to process,
             # where putting all the items in the queue one by one could be inefficient.
             # Instead, we can batch the items and put them in the queue in chunks.

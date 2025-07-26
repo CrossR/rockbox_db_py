@@ -155,7 +155,9 @@ def update_record(
         conn.close()
 
 
-def delete_record(db_path: str, table: str, where_column: str, where_value: Any) -> None:
+def delete_record(
+    db_path: str, table: str, where_column: str, where_value: Any
+) -> None:
     """
     Delete a record from the specified table in the database.
 

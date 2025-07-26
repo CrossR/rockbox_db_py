@@ -122,7 +122,6 @@ def write_rockbox_database(
     elif os.path.exists(output_db_dir) and os.listdir(output_db_dir):
         # Find any database*.tcd files and move them to database*.tcd.bak
         for file in os.listdir(output_db_dir):
-
             if file.startswith("database") and file.endswith(".tcd.bak"):
                 # Previously backed up file...delete it to avoid confusion.
                 os.remove(os.path.join(output_db_dir, file))

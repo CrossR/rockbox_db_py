@@ -4,6 +4,7 @@ import time
 
 from src.file import File
 
+
 def iter_with_progress(iterable, prefix: str = "", size: int = 60, item_details=None):
     """
     Display a progress bar for an iterable with estimated time remaining.
@@ -36,7 +37,7 @@ def iter_with_progress(iterable, prefix: str = "", size: int = 60, item_details=
         details = f" ({item_details(item)})" if item_details and item else ""
 
         print(
-            f"{prefix} [{u'█'*x}{('.'*(size-x))}] {j}/{count} Est wait {time_str}{details}",
+            f"{prefix} [{'█' * x}{('.' * (size - x))}] {j}/{count} Est wait {time_str}{details}",
             end="\r",
             file=sys.stdout,
             flush=True,
@@ -52,6 +53,7 @@ def iter_with_progress(iterable, prefix: str = "", size: int = 60, item_details=
 
     # Add newline after completion
     print("", flush=True, file=sys.stdout)
+
 
 def normalise_path(file: File, root: str) -> str:
     """

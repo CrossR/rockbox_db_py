@@ -108,7 +108,7 @@ class TreeViewManager:
                 "",
                 "end",
                 text=f"🗋 {os.path.basename(file_path)}",
-                values=(file_path, f"{size/1024:.2f}" if size else ""),
+                values=(file_path, f"{size / 1024:.2f}" if size else ""),
             )
             return
 
@@ -129,7 +129,7 @@ class TreeViewManager:
             # Check if node exists or create it
             if not tree.exists(item_id):
                 is_file = i == len(path_parts) - 1
-                size_display = f"{size/1024:.2f}" if is_file and size > 0 else ""
+                size_display = f"{size / 1024:.2f}" if is_file and size > 0 else ""
                 icon = "🗋" if is_file else "📁"
 
                 tree.insert(
