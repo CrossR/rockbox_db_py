@@ -5,9 +5,11 @@ import time
 
 from rockbox_db_py.utils.defs import TagTypeEnum
 from rockbox_db_py.utils.helpers import (
+    load_rockbox_database,
     scan_music_directory,
     build_rockbox_database_from_music_files,
     write_rockbox_database,
+    copy_metadata_between_databases,
 )
 
 from src.db_helpers import get_sync_table, make_sync_table
@@ -65,7 +67,7 @@ def scan_for_files(
             add_callback(file.path)
         if progress_callback:
             progress_callback(
-                "progress", int((i + 1) / total_items_to_process)
+                "progress", int((i + 1) / total_items_to_process * 100)
             )  # Increment progress for scan
 
     for i, file in enumerate(files_to_update):
@@ -73,7 +75,8 @@ def scan_for_files(
             update_callback(file.path)
         if progress_callback:
             progress_callback(
-                "progress", int((len(files_to_add) + i + 1) / total_items_to_process)
+                "progress",
+                int((len(files_to_add) + i + 1) / total_items_to_process * 100),
             )
 
     for i, file in enumerate(files_to_delete):
@@ -85,6 +88,7 @@ def scan_for_files(
                 int(
                     (len(files_to_add) + len(files_to_update) + i + 1)
                     / total_items_to_process
+                    * 100
                 ),
             )
 
@@ -186,6 +190,23 @@ def populate_rockbox_db(
     new_database = build_rockbox_database_from_music_files(music_files)
     progress_callback("message", "Rockbox database built in memory.")
 
+    # Copy metadata from the existing database if it exists
+    old_db_path = os.path.join(rockbox_output_folder, "database_idx.tcd")
+    if os.path.exists(old_db_path):
+        progress_callback("message", "Processing existing database...")
+        old_db = load_rockbox_database(rockbox_output_folder)
+        progress_callback("message", "Existing database loaded.")
+
+        if not old_db:
+            progress_callback(
+                "message", "No existing database found. Skipping metadata copy."
+            )
+        else:
+            # Copy metadata from the old database to the new one
+            progress_callback("message", "Copying metadata from existing database...")
+            copy_metadata_between_databases(old_db, new_database)
+            progress_callback("message", "Metadata copied from existing database.")
+
     # Build a sort map, to ensure consistent sorting of entries
     progress_callback("message", "Building sort map for database entries...")
     sort_map = {TagTypeEnum.title: {}}
@@ -195,6 +216,6 @@ def populate_rockbox_db(
 
     progress_callback("message", "Writing Rockbox database to disk...")
     write_rockbox_database(new_database, rockbox_output_folder)
-    progress_callback("message", "Rockbox database written to disk!")
+    progress_callback("message", "Rockbox database written to disk.")
 
     print("Rockbox database has been updated!")
