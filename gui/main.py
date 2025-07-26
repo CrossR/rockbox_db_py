@@ -118,7 +118,9 @@ class SimpleApp:
         self.log_message(
             "Get Changes will compare your device files with the input folder."
         )
-        self.log_message("Apply Updates will apply the changes to your device files.")
+        self.log_message(
+            "Apply Updates will apply the listed changes to your device files."
+        )
         self.log_message(
             "Build Rockbox DB will build a Rockbox database from your device files."
         )
