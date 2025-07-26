@@ -3,11 +3,11 @@ import os
 import json
 
 from dataclasses import dataclass, field
+from rockbox_db_py.classes.music_file import SUPPORTED_MUSIC_EXTENSIONS
 
 # Which file extensions to track for syncing
 FILES_TO_TRACK = [
-    ".mp3",
-    ".flac",
+    *SUPPORTED_MUSIC_EXTENSIONS,
     ".png",
     ".jpg",
     ".jpeg",

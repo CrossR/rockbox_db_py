@@ -1,7 +1,6 @@
 import os
 import shutil
 
-from src.config import FILES_TO_TRACK
 from src.db_helpers import (
     insert_record,
     delete_record,
