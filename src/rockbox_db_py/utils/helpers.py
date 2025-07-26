@@ -122,15 +122,14 @@ def write_rockbox_database(
     elif os.path.exists(output_db_dir) and os.listdir(output_db_dir):
         # Find any database*.tcd files and move them to database*.tcd.bak
         for file in os.listdir(output_db_dir):
-            if file.startswith("database") and file.endswith(".tcd.bak"):
-                # Previously backed up file...delete it to avoid confusion.
-                os.remove(os.path.join(output_db_dir, file))
-                continue
-
-            if not file.startswith(".") or not file.endswith(".tcd"):
+            if not file.startswith("database") or not file.endswith(".tcd"):
                 continue
             old_file_path = os.path.join(output_db_dir, file)
-            new_file_path = os.path.join(output_db_dir, f"{file}.bak")
+            new_file_path = os.path.join(output_db_dir, ".backup", file)
+
+            # Ensure the backup directory exists
+            os.makedirs(os.path.dirname(new_file_path), exist_ok=True)
+
             try:
                 shutil.move(old_file_path, new_file_path)
                 print(f"Moved existing {file} to {new_file_path}")
@@ -231,9 +230,9 @@ def scan_music_directory(
             if result:
                 music_files.append(result)
             if custom_progress_callback:
-                print(int(len(music_files) / len(all_potential_audio_paths)))
                 custom_progress_callback(
-                    "progress", int(len(music_files) / len(all_potential_audio_paths))
+                    "progress",
+                    int((len(music_files) / len(all_potential_audio_paths)) * 100),
                 )
 
     if not music_files:
