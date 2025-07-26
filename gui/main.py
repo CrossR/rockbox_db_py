@@ -109,6 +109,20 @@ class SimpleApp:
         # Make the text widget read-only
         self.message_log.config(state="disabled")
 
+        # Insert initial message
+        self.log_message("Welcome to RockBox Sync Helper!")
+        self.log_message("Broadly, follow the buttons in order from left to right.")
+        self.log_message(
+            "Verify Device Files will build a sync-DB with your device files."
+        )
+        self.log_message(
+            "Get Changes will compare your device files with the input folder."
+        )
+        self.log_message("Apply Updates will apply the changes to your device files.")
+        self.log_message(
+            "Build Rockbox DB will build a Rockbox database from your device files."
+        )
+
     def create_tabs(self):
         # Delegate to tree manager
         tree_manager = TreeViewManager(self, self.root)
@@ -146,6 +160,13 @@ class SimpleApp:
         )
         self.dry_run_checkbox.pack(side="left", padx=10)
 
+        self.verify_device_files_button = tk.Button(
+            button_frame,
+            text="Verify Device Files",
+            command=self.worker_manager.verify_device_files,
+        )
+        self.verify_device_files_button.pack(side="left", padx=10)
+
         self.load_lists_button = tk.Button(
             button_frame,
             text="Get Changes",
@@ -160,13 +181,6 @@ class SimpleApp:
             state=tk.DISABLED,
         )
         self.apply_updates_button.pack(side="left", padx=10)
-
-        self.verify_device_files_button = tk.Button(
-            button_frame,
-            text="Verify Device Files",
-            command=self.worker_manager.verify_device_files,
-        )
-        self.verify_device_files_button.pack(side="left", padx=10)
 
         self.build_rockbox_db_button = tk.Button(
             button_frame,
