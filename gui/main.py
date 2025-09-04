@@ -1,3 +1,9 @@
+# Main entry point for the RockBox Sync Helper GUI application.
+
+# Multiprocessing needs to be the first import in the main thread
+# to ensure that the worker processes are spawned correctly.
+import multiprocessing
+
 import time
 import queue
 
@@ -316,6 +322,11 @@ class SimpleApp:
 
 
 if __name__ == "__main__":
+
+    # Ensure multiprocessing is set up correctly
+    multiprocessing.freeze_support()
+    multiprocessing.set_start_method("spawn", force=True)
+
     root = tk.Tk()
     app = SimpleApp(root)
     root.mainloop()
