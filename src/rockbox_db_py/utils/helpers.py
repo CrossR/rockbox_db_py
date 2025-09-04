@@ -268,8 +268,9 @@ def build_rockbox_database_from_music_files(
 
     # Process each MusicFile to create IndexFileEntry and populate TagFiles.
     for song_idx, music_file in tqdm(
-        enumerate(music_files), desc="Processing music files into DB",
-        disable=not show_progress
+        enumerate(music_files),
+        desc="Processing music files into DB",
+        disable=not show_progress,
     ):
         new_index_entry: IndexFileEntry = IndexFileEntry(tag_seek=[0] * TAG_COUNT)
 

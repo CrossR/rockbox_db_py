@@ -322,7 +322,6 @@ class SimpleApp:
 
 
 if __name__ == "__main__":
-
     # Ensure multiprocessing is set up correctly
     multiprocessing.freeze_support()
     multiprocessing.set_start_method("spawn", force=True)
