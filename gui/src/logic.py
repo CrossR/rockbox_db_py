@@ -187,7 +187,9 @@ def populate_rockbox_db(
         return
 
     progress_callback("message", "Building Rockbox database...")
-    new_database = build_rockbox_database_from_music_files(music_files)
+    new_database = build_rockbox_database_from_music_files(
+        music_files, show_progress=False, custom_progress_callback=progress_callback
+    )
     progress_callback("message", "Rockbox database built in memory.")
 
     # Copy metadata from the existing database if it exists

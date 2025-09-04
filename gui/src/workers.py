@@ -57,7 +57,7 @@ class WorkerManager:
             self.parent_app.queue.put(
                 (
                     "message",
-                    "On most older devices, we are simply IO bound, so don't be"
+                    "On most older devices, we are simply IO bound, so don't be "
                     "alarmed by the low number of workers.",
                 )
             )

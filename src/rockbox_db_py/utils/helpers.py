@@ -243,6 +243,8 @@ def scan_music_directory(
 
 def build_rockbox_database_from_music_files(
     music_files: List[MusicFile],
+    show_progress: bool = True,
+    custom_progress_callback: Optional[callable] = None,
 ) -> IndexFile:
     """
     Builds a complete Rockbox database (IndexFile and associated TagFiles)
@@ -266,7 +268,8 @@ def build_rockbox_database_from_music_files(
 
     # Process each MusicFile to create IndexFileEntry and populate TagFiles.
     for song_idx, music_file in tqdm(
-        enumerate(music_files), desc="Processing music files into DB"
+        enumerate(music_files), desc="Processing music files into DB",
+        disable=not show_progress
     ):
         new_index_entry: IndexFileEntry = IndexFileEntry(tag_seek=[0] * TAG_COUNT)
 
@@ -333,6 +336,13 @@ def build_rockbox_database_from_music_files(
         # Add the constructed IndexFileEntry to the main_index.
         main_index.add_entry(new_index_entry)
 
+        # Finally, report progress if a callback is provided.
+        if custom_progress_callback:
+            custom_progress_callback(
+                "progress",
+                int((len(main_index.entries) / len(music_files)) * 100),
+            )
+
     return main_index
 
 
@@ -353,7 +363,7 @@ def copy_metadata_between_databases(source_db: IndexFile, target_db: IndexFile) 
     """
 
     # First, build a map for the old database, from music path to IndexFileEntry.
-    old_db_map: Dict[str, IndexFileEntry] = {
+    old_db_map: Dict[str | int | None, IndexFileEntry] = {
         entry.get_parsed_tag_value(TagTypeEnum.filename): entry
         for entry in source_db.entries
     }
@@ -361,7 +371,7 @@ def copy_metadata_between_databases(source_db: IndexFile, target_db: IndexFile) 
     # Now, iterate through the target database entries and copy metadata.
     missed_count: int = 0
     for target_entry in target_db.entries:
-        current_filename: str = target_entry.get_parsed_tag_value(TagTypeEnum.filename)
+        current_filename = target_entry.get_parsed_tag_value(TagTypeEnum.filename)
 
         if current_filename not in old_db_map:
             missed_count += 1
