@@ -2,6 +2,10 @@
 
 An implementation of the Rockbox database, in Python.
 
+<p align="center">
+<img width="601" height="699" alt="image" src="https://github.com/user-attachments/assets/d903b3c5-aba8-4669-bf14-839daa23084a" />
+</p>
+
 # Features
 
 Two main sets of features:
