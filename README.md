@@ -4,6 +4,13 @@ An implementation of the Rockbox database, in Python.
 
 # Features
 
+Two main sets of features:
+
+#### RockBox DB Parsing Library
+
+A python re-implementation of the Rockbox database.
+This comes with a bunch of advantages versus doing it on device:
+
 - Multi-threaded indexing of your music collection
   - Should be much faster, especially on large collections, usually less than a
     second per 1000 files.
@@ -16,6 +23,26 @@ An implementation of the Rockbox database, in Python.
   - This is REALLY useful for things like the genre, where you can "canonicalize"
     a list of genres to a single genre, significantly reducing the entries
     in the database.
+
+#### Sync GUI
+
+Building on the RockBox DB Parsing Library, there is a simple GUI app for all
+your basic syncing needs.
+
+That is:
+
+ - Build a basic, on device DB for quick look-ups of your music collection.
+ - Then, using that, sync over changes (new files, updated files, deletions).
+ - Once the changes have been visually checked in the GUI, apply all the
+   updates to your device.
+ - Finally, with the click of a button, build a new, updated rockbox DB
+   in a few seconds, copying over some of the useful playback stats etc,
+   and backing up the old DB.
+
+Ideally, you should be able to run the GUI, get your device in sync,
+and have an updated DB to start playback instantly, only limited by
+the time it takes to sync your music, and then a few more seconds to
+build your DB, rather than the minutes it can take on-device.
 
 # Current Caveats
 
@@ -60,7 +87,63 @@ There is a few caveats to be aware of, as this is a work in progress:
   Rockbox) are non-sensical. I don't care about comments, so I haven't looked
   into it in a lot of detail, and the DB works fine, so it isn't a priority.
 
-# Installation
+# Using the GUI
+
+First, download a release from https://github.com/CrossR/rockbox_db_py/releases.
+
+Then, extract and run the executable inside.
+
+You'll get a GUI, with hopefully intuitive options at the top, to select your 3
+folders: Input Music Folder, Output Music Folder, where your rockbox DB files
+live (i.e. your `.rockbox` folder on your device).
+
+> [!WARNING]
+> I'd REALLY suggest running this the first time on a test dataset. Don't
+> point it at your full music folder. Point it at one artist, and set your
+> output and rockbox folders to some fake folder in your Downloads or something
+> with like 1 album from the artist in it.
+>
+> Verify it all works, nothing breaks, then move on to a real test.
+>
+> This shouldn't break your source files, since I'm using standard tools
+> that well loved tools like `beets` use to manage music files...but
+> best to be safe!
+
+From there, you basically follow the buttons along the bottom.
+
+If this is your first time using the GUI, you'll first want to click "Verify
+Device Files". This will make a little on device sync database, that the rest
+of the syncing will use. This should take a few seconds.
+
+Once that is done, you can move to "Get Changes". This will essentially
+compare the sync database to your input folder and identify any changes.
+These changes will then be displayed in the relevant tabs in the GUI:
+To Add, To Update, To Delete, along with a count of the changes.
+
+Verify the changes! If it says its going to delete everything or add
+a bunch of rubbish, double check everything, or report an issue! Ideally,
+it should just show your new music and maybe some changes you've made.
+If it doesn't look right, don't carry on!
+
+If it does look right....you can now click "Apply Changes". It will
+alert you that its going to do the changes you've just seen,
+so confirm, and wait. This bit is still just as slow as manually dragging
+stuff over...since we are limited by USB / the device itself.
+
+Wait, get a cup of tea (the progress timer is vaguely accurate at least),
+and come back when its done.
+
+Finally, your device is now in sync with your music folder! You can now
+press the "Build Rockbox DB" button. That will do as it says, and scan
+all your music and build a new DB, installing it in the location
+you said at the top. It'll copy over basic stats (check the Caveats section
+above for more info), and make a backup next to the original files.
+That should take a few seconds, but should be much faster than your device
+doing it!
+
+Once that is complete, it will let you know in the log...and you are done!
+
+# Development Installation
 
 Right now....this is a work in progress / proof of concept, so this is really for
 developers. I do plan to produce a full, pre-made release with a GUI and all that
@@ -85,7 +168,7 @@ uv sync
 uv pip install -e .
 ```
 
-# Usage
+# CLI Usage (DB Building Only)
 
 Once you have the project setup, the steps are as follows:
 
@@ -172,10 +255,6 @@ Once you have the project setup, the steps are as follows:
 
 
 # TODO / Other Ideas
-
- - Full GUI, such that you can just select an input / output folder and it
-   will do everything for you. This is a work in progress, and I will
-   probably do this once the core functionality is working well.
 
  - We can actually insert metadata from other sources...so we could somewhat
    easily insert last.fm play counts, ratings, etc. into the database, via
