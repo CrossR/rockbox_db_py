@@ -1,0 +1,50 @@
+name: Make GUI Executables
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version-file: ".python-version"
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
+      with:
+        version: 'latest'
+
+    - name: Install dependencies
+      run: uv sync --locked --all-extras --dev
+
+    - name: Add pyinstaller
+      run: uv add pyinstaller
+
+    - name: Build GUI executable
+      run: |
+        cd gui
+        uv run pyinstaller --name "RockBox Sync Helper" --onedir --windowed --noconfirm main.py
+        ls dist/
+
+    - name: Upload executable
+      uses: actions/upload-artifact@v4
+      with:
+        name: rockbox-sync-helper-${{ matrix.os }}
+        path: gui/dist/*
+

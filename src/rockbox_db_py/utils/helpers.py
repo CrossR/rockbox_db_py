@@ -112,17 +112,30 @@ def write_rockbox_database(
     """
 
     # Ensure output directory exists and is ready for writing.
+    #
+    # If it does exist, move the existing files to a backup location.
     if not os.path.exists(output_db_dir):
         try:
             os.makedirs(output_db_dir)
         except OSError:
             raise
     elif os.path.exists(output_db_dir) and os.listdir(output_db_dir):
-        try:
-            shutil.rmtree(output_db_dir)
-            os.makedirs(output_db_dir)
-        except OSError:
-            raise
+        # Find any database*.tcd files and move them to database*.tcd.bak
+        for file in os.listdir(output_db_dir):
+            if not file.startswith("database") or not file.endswith(".tcd"):
+                continue
+            old_file_path = os.path.join(output_db_dir, file)
+            new_file_path = os.path.join(output_db_dir, ".backup", file)
+
+            # Ensure the backup directory exists
+            os.makedirs(os.path.dirname(new_file_path), exist_ok=True)
+
+            try:
+                shutil.move(old_file_path, new_file_path)
+                print(f"Moved existing {file} to {new_file_path}")
+            except OSError as e:
+                print(f"Error moving {old_file_path} to {new_file_path}: {e}")
+                return False
 
     try:
         # Write all associated tag files FIRST.
@@ -171,7 +184,11 @@ def _process_file(path: str) -> Optional[MusicFile]:
 
 
 def scan_music_directory(
-    directory_path: str, num_processes: Optional[int] = None, show_progress: bool = True
+    directory_path: str,
+    num_processes: Optional[int] = None,
+    show_progress: bool = True,
+    custom_progress_callback: Optional[callable] = None,
+    extensions: List[str] = SUPPORTED_MUSIC_EXTENSIONS,
 ) -> List[MusicFile]:
     """
     Recursively scans a directory for music files and returns a list of MusicFile objects.
@@ -194,7 +211,7 @@ def scan_music_directory(
             file_path: str = os.path.join(root, file)
             file_extension: str = os.path.splitext(file_path)[1].lower()
 
-            if file_extension in SUPPORTED_MUSIC_EXTENSIONS:
+            if file_extension in extensions:
                 all_potential_audio_paths.append(file_path)
 
     # Phase 2: Parallel parse audio files
@@ -212,6 +229,11 @@ def scan_music_directory(
         ):
             if result:
                 music_files.append(result)
+            if custom_progress_callback:
+                custom_progress_callback(
+                    "progress",
+                    int((len(music_files) / len(all_potential_audio_paths)) * 100),
+                )
 
     if not music_files:
         print("No valid music files found or parsed successfully.")
@@ -221,6 +243,8 @@ def scan_music_directory(
 
 def build_rockbox_database_from_music_files(
     music_files: List[MusicFile],
+    show_progress: bool = True,
+    custom_progress_callback: Optional[callable] = None,
 ) -> IndexFile:
     """
     Builds a complete Rockbox database (IndexFile and associated TagFiles)
@@ -244,7 +268,9 @@ def build_rockbox_database_from_music_files(
 
     # Process each MusicFile to create IndexFileEntry and populate TagFiles.
     for song_idx, music_file in tqdm(
-        enumerate(music_files), desc="Processing music files into DB"
+        enumerate(music_files),
+        desc="Processing music files into DB",
+        disable=not show_progress,
     ):
         new_index_entry: IndexFileEntry = IndexFileEntry(tag_seek=[0] * TAG_COUNT)
 
@@ -311,11 +337,17 @@ def build_rockbox_database_from_music_files(
         # Add the constructed IndexFileEntry to the main_index.
         main_index.add_entry(new_index_entry)
 
+        # Finally, report progress if a callback is provided.
+        if custom_progress_callback:
+            custom_progress_callback(
+                "progress",
+                int((len(main_index.entries) / len(music_files)) * 100),
+            )
+
     return main_index
 
-def copy_metadata_between_databases(
-    source_db: IndexFile, target_db: IndexFile
-) -> int:
+
+def copy_metadata_between_databases(source_db: IndexFile, target_db: IndexFile) -> int:
     """
     Copies basic metadata from one IndexFile to another.
     This is useful for transferring metadata like playcounts, ratings, etc.
@@ -332,7 +364,7 @@ def copy_metadata_between_databases(
     """
 
     # First, build a map for the old database, from music path to IndexFileEntry.
-    old_db_map: Dict[str, IndexFileEntry] = {
+    old_db_map: Dict[str | int | None, IndexFileEntry] = {
         entry.get_parsed_tag_value(TagTypeEnum.filename): entry
         for entry in source_db.entries
     }
@@ -340,9 +372,7 @@ def copy_metadata_between_databases(
     # Now, iterate through the target database entries and copy metadata.
     missed_count: int = 0
     for target_entry in target_db.entries:
-        current_filename: str = target_entry.get_parsed_tag_value(
-            TagTypeEnum.filename
-        )
+        current_filename = target_entry.get_parsed_tag_value(TagTypeEnum.filename)
 
         if current_filename not in old_db_map:
             missed_count += 1
@@ -351,20 +381,20 @@ def copy_metadata_between_databases(
         old_entry: IndexFileEntry = old_db_map[current_filename]
 
         # Copy over basic metadata fields.
-        target_entry.tag_seek[TagTypeEnum.playcount.value] = (
-            old_entry.tag_seek[TagTypeEnum.playcount.value]
-        )
-        target_entry.tag_seek[TagTypeEnum.rating.value] = (
-            old_entry.tag_seek[TagTypeEnum.rating.value]
-        )
-        target_entry.tag_seek[TagTypeEnum.lastplayed.value] = (
-            old_entry.tag_seek[TagTypeEnum.lastplayed.value]
-        )
-        target_entry.tag_seek[TagTypeEnum.lastelapsed.value] = (
-            old_entry.tag_seek[TagTypeEnum.lastelapsed.value]
-        )
-        target_entry.tag_seek[TagTypeEnum.lastoffset.value] = (
-            old_entry.tag_seek[TagTypeEnum.lastoffset.value]
-        )
+        target_entry.tag_seek[TagTypeEnum.playcount.value] = old_entry.tag_seek[
+            TagTypeEnum.playcount.value
+        ]
+        target_entry.tag_seek[TagTypeEnum.rating.value] = old_entry.tag_seek[
+            TagTypeEnum.rating.value
+        ]
+        target_entry.tag_seek[TagTypeEnum.lastplayed.value] = old_entry.tag_seek[
+            TagTypeEnum.lastplayed.value
+        ]
+        target_entry.tag_seek[TagTypeEnum.lastelapsed.value] = old_entry.tag_seek[
+            TagTypeEnum.lastelapsed.value
+        ]
+        target_entry.tag_seek[TagTypeEnum.lastoffset.value] = old_entry.tag_seek[
+            TagTypeEnum.lastoffset.value
+        ]
 
     return missed_count
