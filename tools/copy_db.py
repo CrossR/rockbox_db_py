@@ -25,7 +25,7 @@ from typing import Optional
 def load_and_write_rockbox_database(
     input_db_dir: str,
     output_db_dir: str,
-):
+) -> bool:
     """
     Loads a Rockbox database from input_db_dir and writes it to output_db_dir
     using the new helper functions.
@@ -44,16 +44,18 @@ def load_and_write_rockbox_database(
 
     if main_index is None:
         print("Failed to load the Rockbox database.")
-        return  # Exit if loading failed
+        return False
 
-    # 2. Write the database to the new location using the helper function
-    # auto_finalize is True by default in write_rockbox_database
+    # 2. Write the database to the new location using the helper function.
+    # Keep auto_finalize enabled so index tag offsets are updated after tag files are written.
     try:
-        write_rockbox_database(main_index, output_db_dir, auto_finalize=False)
+        write_rockbox_database(main_index, output_db_dir)
         print("Database writing and saving complete.")
     except Exception as e:
         print(f"Error writing database: {e}")
-        return
+        return False
+
+    return True
 
 
 def compare_files(input_db_dir, output_db_dir):
@@ -329,11 +331,15 @@ def parse_args():
 
 def main():
     args = parse_args()
-    load_and_write_rockbox_database(args.input_db_dir, args.output_db_dir)
+    success = load_and_write_rockbox_database(args.input_db_dir, args.output_db_dir)
+
+    if not success:
+        print("\n--- Process finished (failed) ---")
+        return
 
     if args.compare:
-        success = compare_files(args.input_db_dir, args.output_db_dir)
-        if not success:
+        files_match = compare_files(args.input_db_dir, args.output_db_dir)
+        if not files_match:
             compare_parsed_dbs(
                 IndexFile.from_file(
                     os.path.join(args.input_db_dir, RockboxDBFileType.INDEX.filename)

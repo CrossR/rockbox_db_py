@@ -113,17 +113,10 @@ class TagFile:
         self.entries_by_offset = {}
         self.entries_by_tag_data = {}
 
-        # Sort entries before writing if the TagFile type expects it (e.g., genre, artist).
-        # However, filename databases are not sorted by tag data.
-        if self.db_file_type != RockboxDBFileType.FILENAME:
-            # If a sort_map is provided, use it to sort entries by the mapped tag data.
-            # This allows for custom sorting based on external criteria, or simply breaking
-            # ties in a consistent way.
-            if sort_map:
-                self.entries.sort(key=lambda e: sort_map.get(e.tag_data, e.tag_data))
-            else:
-                # Sort entries by tag_data (case-insensitive)
-                self.entries.sort(key=lambda e: e.tag_data.lower())
+        # Preserve existing entry order by default so read->write round trips can
+        # remain byte-for-byte stable. Only apply sorting when explicitly requested.
+        if sort_map:
+            self.entries.sort(key=lambda e: sort_map.get(e.tag_data, e.tag_data))
 
         with open(filepath, "wb") as f:
             # Write TagFile header.
