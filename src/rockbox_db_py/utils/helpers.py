@@ -129,15 +129,15 @@ def write_rockbox_database(
                     index_entry.tag_seek[tag_idx] = 0xFFFFFFFF
                     continue
 
-                tag_file_for_this_tag: Optional[TagFile] = main_index.loaded_tag_files.get(
-                    tag_idx
+                tag_file_for_this_tag: Optional[TagFile] = (
+                    main_index.loaded_tag_files.get(tag_idx)
                 )
                 if not tag_file_for_this_tag:
                     index_entry.tag_seek[tag_idx] = 0xFFFFFFFF
                     continue
 
-                target_entry: Optional[TagFileEntry] = tag_file_for_this_tag.get_entry_by_offset(
-                    current_tag_seek_value
+                target_entry: Optional[TagFileEntry] = (
+                    tag_file_for_this_tag.get_entry_by_offset(current_tag_seek_value)
                 )
                 if target_entry is None:
                     index_entry.tag_seek[tag_idx] = 0xFFFFFFFF
