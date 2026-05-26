@@ -111,6 +111,40 @@ def write_rockbox_database(
                   for deterministic sorting of entries in TagFiles.
     """
 
+    # Convert persisted integer offsets to TagFileEntry references before tag files
+    # are rewritten. This is only safe when finalization is enabled in this call,
+    # because finalize_index_for_write converts these references back to integers.
+    if auto_finalize:
+        for index_entry in main_index.entries:
+            for tag_idx in FILE_TAG_INDICES:
+                current_tag_seek_value: Union[int, TagFileEntry] = index_entry.tag_seek[
+                    tag_idx
+                ]
+
+                if not isinstance(current_tag_seek_value, int):
+                    continue
+
+                # 0 and 0xFFFFFFFF are treated as empty/sentinel for file-based tags.
+                if current_tag_seek_value in (0, 0xFFFFFFFF):
+                    index_entry.tag_seek[tag_idx] = 0xFFFFFFFF
+                    continue
+
+                tag_file_for_this_tag: Optional[TagFile] = (
+                    main_index.loaded_tag_files.get(tag_idx)
+                )
+                if not tag_file_for_this_tag:
+                    index_entry.tag_seek[tag_idx] = 0xFFFFFFFF
+                    continue
+
+                target_entry: Optional[TagFileEntry] = (
+                    tag_file_for_this_tag.get_entry_by_offset(current_tag_seek_value)
+                )
+                if target_entry is None:
+                    index_entry.tag_seek[tag_idx] = 0xFFFFFFFF
+                    continue
+
+                index_entry.tag_seek[tag_idx] = target_entry
+
     # Ensure output directory exists and is ready for writing.
     #
     # If it does exist, move the existing files to a backup location.
@@ -151,10 +185,12 @@ def write_rockbox_database(
             )
 
             # If a sort_map is provided for this TagFile, get it.
-            if sort_map and tag_file_obj in sort_map:
-                tag_file_sort_map = sort_map[tag_file_obj]
-            else:
-                tag_file_sort_map = None
+            tag_file_sort_map = None
+            if sort_map:
+                for sort_key, mapped_values in sort_map.items():
+                    if getattr(sort_key, "value", None) == tag_index:
+                        tag_file_sort_map = mapped_values
+                        break
 
             # This updates entry.offset_in_file for all entries
             tag_file_obj.to_file(output_tag_filepath, sort_map=tag_file_sort_map)
